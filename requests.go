@@ -4,11 +4,6 @@ package larder
 // Requests
 // Copyright © 2018 Eduard Sesigin. All rights reserved. Contacts: <claygod@yandex.ru>
 
-//import (
-//	// "fmt"
-//	"sync"
-//)
-
 type reqAdd struct {
 	key          string
 	value        []byte
@@ -22,12 +17,12 @@ type reqDelete struct {
 
 type reqTransaction struct {
 	keys         []string
-	values       [][]byte
+	args         [][]byte
 	responseChan chan resTransaction
+	handler      func([][]byte, [][]byte) ([][]byte, error)
 }
 
 type resTransaction struct {
-	keys   []string
 	values [][]byte
 	err    error
 }

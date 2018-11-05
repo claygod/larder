@@ -24,9 +24,13 @@ func newStorage() *storage {
 }
 
 func (s *storage) get(keys []string) ([][]byte, error) {
+	s.mtx.Lock()
+	defer s.mtx.Unlock()
 	return nil, nil
 }
 
 func (s *storage) set(keys []string, datas [][]byte) error {
+	s.mtx.Lock()
+	defer s.mtx.Unlock()
 	return nil
 }
