@@ -1,7 +1,7 @@
 package larder
 
 // Larder
-// Storage
+// Data storage
 // Copyright © 2018 Eduard Sesigin. All rights reserved. Contacts: <claygod@yandex.ru>
 
 import (
@@ -9,6 +9,9 @@ import (
 	"sync"
 )
 
+/*
+storage - data parallel storage
+*/
 type storage struct {
 	mtx  sync.Mutex
 	data map[string][]byte

@@ -5,19 +5,21 @@ package larder
 // Copyright © 2018 Eduard Sesigin. All rights reserved. Contacts: <claygod@yandex.ru>
 
 import (
+	//"fmt"
 	"runtime"
 	"sort"
 	"sync"
+	"time"
 )
 
 type porter struct {
 	mtx    sync.Mutex
-	locked map[string]bool
+	locked map[string]int64
 }
 
 func newPorter() *porter {
 	return &porter{
-		locked: make(map[string]bool),
+		locked: make(map[string]int64),
 	}
 }
 
@@ -28,22 +30,31 @@ func (p *porter) lock(keys []string) {
 	for {
 		counter = 0
 		p.mtx.Lock()
+		var num int64
 		for i, key := range keys {
-			if _, ok := p.locked[key]; ok {
+			if n, ok := p.locked[key]; ok {
+				p.locked[key]++
+				num = n
+				//fmt.Print("Заблокированно: ", key)
 				for u := 0; u < i; u++ {
 					delete(p.locked, keys[u])
+					//fmt.Print("Удаляем: ", u)
 				}
 				break
 			}
-			p.locked[key] = true
+			//fmt.Print("Ш3: ", key)
+			p.locked[key] = 0
 			counter++
 		}
+		//fmt.Print("Ш4: ", num)
+		p.mtx.Unlock()
 		if counter == ln {
-			p.mtx.Unlock()
+			//p.mtx.Unlock()
 			return
 		}
-		p.mtx.Unlock()
+
 		runtime.Gosched()
+		time.Sleep(time.Duration(num) * 100 * time.Microsecond)
 	}
 }
 
