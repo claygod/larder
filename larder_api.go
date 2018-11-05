@@ -16,9 +16,9 @@ const (
 )
 
 type Larder struct {
-	mtx           sync.Mutex
-	handlers      *handlers //map[string]func([][]byte, [][]byte) ([][]byte, error)
-	porter        *porter
+	mtx      sync.Mutex
+	handlers *handlers //map[string]func([][]byte, [][]byte) ([][]byte, error)
+	// porter        *porter
 	store         *storage
 	stor          map[string][]byte
 	chAdd         chan reqAdd
@@ -31,8 +31,8 @@ type Larder struct {
 func New() *Larder {
 	return &Larder{
 		handlers: newHandlers(), // make(map[string]func([][]byte, [][]byte) ([][]byte, error)),
-		porter:   newPorter(),
-		store:    newStorage(),
+		// porter:   newPorter(),
+		store: newStorage(),
 	}
 }
 
