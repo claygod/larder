@@ -90,6 +90,14 @@ func (l *Larder) SetHandler(handlerName string, handlerMethod func([][]byte, [][
 
 /*
 Transaction - read, update of specified records, but not adding or deleting records.
+Arguments:
+- name of the handler for this transaction
+- keys of records that will participate in the transaction
+- additional arguments for each of the keys (records)
+
+The length of the third argument does not have to match the length of the second.
+For example, for the exchange of the contents of two records, the third argument may be a length of zero.
+The correctness of the length of the third argument can only be judged by the handler being called.
 */
 func (l *Larder) Transaction(handlerName string, keys []string, args [][]byte) ([][]byte, error) {
 	hdl, err := l.handlers.get(handlerName)
