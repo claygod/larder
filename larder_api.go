@@ -83,9 +83,9 @@ func (l *Larder) Delete(key string) error { //TODO:
 }
 
 func (l *Larder) SetHandler(handlerName string, handlerMethod func([]string, Repo, interface{}) error) error {
-	if atomic.LoadInt64(&l.hasp) == stateStarted {
-		return fmt.Errorf("Handles cannot be added while the application is running.")
-	}
+	//	if atomic.LoadInt64(&l.hasp) == stateStarted {
+	//		return fmt.Errorf("Handles cannot be added while the application is running.")
+	//	}
 	return l.handlers.set(handlerName, handlerMethod)
 }
 
