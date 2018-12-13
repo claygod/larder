@@ -5,9 +5,11 @@ package larder
 // Copyright © 2018 Eduard Sesigin. All rights reserved. Contacts: <claygod@yandex.ru>
 
 import (
-	// "fmt"
+	"fmt"
 	"sync"
 	"sync/atomic"
+
+	"github.com/claygod/larder/repo"
 )
 
 const (
@@ -17,9 +19,9 @@ const (
 
 type Larder struct {
 	mtx      sync.Mutex
-	handlers *handlers //map[string]func([][]byte, [][]byte) ([][]byte, error)
+	handlers *handlers
 	// porter        *porter
-	store         *storage
+	store         *inMemoryStorage
 	stor          map[string][]byte
 	chAdd         chan reqAdd
 	chDelete      chan reqDelete
@@ -30,9 +32,9 @@ type Larder struct {
 
 func New() *Larder {
 	return &Larder{
-		handlers: newHandlers(), // make(map[string]func([][]byte, [][]byte) ([][]byte, error)),
+		handlers: newHandlers(),
 		// porter:   newPorter(),
-		store: newStorage(),
+		store: newStorage(repo.New()), //TODO: replace nil
 	}
 }
 
@@ -68,51 +70,46 @@ func (l *Larder) worker() {
 	}
 }
 
-func (l *Larder) Create(key string, value []byte) error {
+func (l *Larder) Write(key string, value []byte) error { //TODO:
 	return nil
 }
 
-func (l *Larder) Read(key string) ([]byte, error) {
+func (l *Larder) Read(key string) ([]byte, error) { //TODO:
 	return nil, nil
 }
 
-func (l *Larder) Update(key string, value []byte) error {
+func (l *Larder) Delete(key string) error { //TODO:
 	return nil
 }
 
-func (l *Larder) Delete(key string) error {
-	return nil
-}
-
-func (l *Larder) SetHandler(handlerName string, handlerMethod func([][]byte, [][]byte) ([][]byte, error)) error {
+func (l *Larder) SetHandler(handlerName string, handlerMethod func([]string, Repo, interface{}) error) error {
+	if atomic.LoadInt64(&l.hasp) == stateStarted {
+		return fmt.Errorf("Handles cannot be added while the application is running.")
+	}
 	return l.handlers.set(handlerName, handlerMethod)
 }
 
 /*
-Transaction - read, update of specified records, but not adding or deleting records.
+Transaction - update of specified records, but not adding or deleting records.
 Arguments:
 - name of the handler for this transaction
 - keys of records that will participate in the transaction
-- additional arguments for each of the keys (records)
-
-The length of the third argument does not have to match the length of the second.
-For example, for the exchange of the contents of two records, the third argument may be a length of zero.
-The correctness of the length of the third argument can only be judged by the handler being called.
+- additional arguments
 */
-func (l *Larder) Transaction(handlerName string, keys []string, args [][]byte) ([][]byte, error) {
+func (l *Larder) Transaction(handlerName string, keys []string, v interface{}) error {
 	hdl, err := l.handlers.get(handlerName)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	responseChan := make(chan resTransaction)
+	responseChan := make(chan error)
 	l.chTransaction <- reqTransaction{
 		keys:         keys,
-		args:         args,
+		v:            v,
 		responseChan: responseChan,
 		handler:      hdl,
 	}
-	res := <-responseChan
-	return res.values, res.err
+	err = <-responseChan
+	return err
 }
 
 func (l *Larder) copyKeys(keys []string) []string {

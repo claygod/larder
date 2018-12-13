@@ -14,16 +14,16 @@ handlers - parallel storage
 */
 type handlers struct {
 	mtx      sync.RWMutex
-	handlers map[string]func([][]byte, [][]byte) ([][]byte, error)
+	handlers map[string]func([]string, Repo, interface{}) error
 }
 
 func newHandlers() *handlers {
 	return &handlers{
-		handlers: make(map[string]func([][]byte, [][]byte) ([][]byte, error)),
+		handlers: make(map[string]func([]string, Repo, interface{}) error),
 	}
 }
 
-func (h *handlers) get(handlerName string) (func([][]byte, [][]byte) ([][]byte, error), error) {
+func (h *handlers) get(handlerName string) (func([]string, Repo, interface{}) error, error) {
 	h.mtx.RLock()
 	hdl, ok := h.handlers[handlerName]
 	h.mtx.RUnlock()
@@ -33,7 +33,7 @@ func (h *handlers) get(handlerName string) (func([][]byte, [][]byte) ([][]byte, 
 	return hdl, nil
 }
 
-func (h *handlers) set(handlerName string, handlerMethod func([][]byte, [][]byte) ([][]byte, error)) error {
+func (h *handlers) set(handlerName string, handlerMethod func([]string, Repo, interface{}) error) error {
 	h.mtx.Lock()
 	defer h.mtx.Unlock()
 	_, ok := h.handlers[handlerName]

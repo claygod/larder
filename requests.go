@@ -17,12 +17,12 @@ type reqDelete struct {
 
 type reqTransaction struct {
 	keys         []string
-	args         [][]byte
-	responseChan chan resTransaction
-	handler      func([][]byte, [][]byte) ([][]byte, error)
+	v            interface{}
+	responseChan chan error
+	handler      func([]string, Repo, interface{}) error
 }
 
-type resTransaction struct {
-	values [][]byte
-	err    error
-}
+//type resTransaction struct {
+//	values [][]byte
+//	err    error
+//}
