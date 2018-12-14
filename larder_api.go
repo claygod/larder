@@ -5,11 +5,14 @@ package larder
 // Copyright © 2018 Eduard Sesigin. All rights reserved. Contacts: <claygod@yandex.ru>
 
 import (
-	// "fmt"
+	"fmt"
+	//"os"
 	"sync"
 	"sync/atomic"
 
+	"github.com/claygod/larder/journal"
 	"github.com/claygod/larder/repo"
+	//"github.com/claygod/tools/batcher"
 )
 
 const (
@@ -22,23 +25,31 @@ type Larder struct {
 	handlers *handlers
 	// porter        *porter
 	store   *inMemoryStorage
-	journal Journal
+	journal *journal.Journal
 	//log     Logger
 
 	stor          map[string][]byte
 	chAdd         chan reqAdd
 	chDelete      chan reqDelete
 	chTransaction chan reqTransaction
-	chStop        chan struct{}
-	hasp          int64
+
+	chJournal chan []byte
+	chStop    chan struct{}
+	hasp      int64
 }
 
-func New() *Larder {
+func New(filePath string) *Larder {
+	//f, _ := os.Create(filePath)
+	chInput := make(chan []byte)
+	//b := batcher.NewBatcher(f, mockAlarmHandle, chInput, 10)
+	j := journal.New(filePath, mockAlarmHandle, chInput, 10)
 	return &Larder{
 		handlers: newHandlers(),
 		// porter:   newPorter(),
-		store: newStorage(repo.New()), //TODO: replace nil
-		//TODO: journal: Journal
+		store: newStorage(repo.New()),
+		//TODO: journal: Journal  NewBatcher(workFunc io.Writer, alarmFunc func(error), chInput chan []byte, batchSize int) *Batcher
+		journal:   j,
+		chJournal: chInput,
 		//TODO: log: Logger
 	}
 }
@@ -81,6 +92,11 @@ func (l *Larder) Stop() {
 //}
 
 func (l *Larder) Write(key string, value []byte) error { //TODO:
+	if atomic.LoadInt64(&l.hasp) == stateStopped {
+		return fmt.Errorf("Adding is possible only when the application started")
+
+	}
+	l.store.setRecords(map[string][]byte{key: value})
 	return nil
 }
 
@@ -107,6 +123,10 @@ Arguments:
 - additional arguments
 */
 func (l *Larder) Transaction(handlerName string, keys []string, v interface{}) error {
+	if atomic.LoadInt64(&l.hasp) == stateStopped {
+		return fmt.Errorf("Transaction is possible only when the application started")
+
+	}
 	hdl, err := l.handlers.get(handlerName)
 	if err != nil {
 		return err
@@ -141,6 +161,6 @@ func (l *Larder) getHeader(keys []string) []string {
 	return keys2
 }
 
-func (l *Larder) getJournal([]byte) {
-
+func mockAlarmHandle(err error) {
+	panic(err)
 }
