@@ -6,13 +6,11 @@ package larder
 
 import (
 	"fmt"
-	//"os"
 	"sync"
 	"sync/atomic"
 
 	"github.com/claygod/larder/journal"
 	"github.com/claygod/larder/repo"
-	//"github.com/claygod/tools/batcher"
 )
 
 const (
@@ -21,33 +19,21 @@ const (
 )
 
 type Larder struct {
-	mtx      sync.Mutex
-	handlers *handlers
-	// porter        *porter
-	store   *inMemoryStorage
-	journal *journal.Journal
-	//log     Logger
-
-	stor          map[string][]byte
-	chAdd         chan reqAdd
-	chDelete      chan reqDelete
-	chTransaction chan reqTransaction
-
+	mtx       sync.Mutex
+	handlers  *handlers
+	store     *inMemoryStorage
+	journal   *journal.Journal
 	chJournal chan []byte
 	chStop    chan struct{}
 	hasp      int64
 }
 
 func New(filePath string) *Larder {
-	//f, _ := os.Create(filePath)
 	chInput := make(chan []byte)
-	//b := batcher.NewBatcher(f, mockAlarmHandle, chInput, 10)
 	j := journal.New(filePath, mockAlarmHandle, chInput, 10)
 	return &Larder{
-		handlers: newHandlers(),
-		// porter:   newPorter(),
-		store: newStorage(repo.New()),
-		//TODO: journal: Journal  NewBatcher(workFunc io.Writer, alarmFunc func(error), chInput chan []byte, batchSize int) *Batcher
+		handlers:  newHandlers(),
+		store:     newStorage(repo.New()),
 		journal:   j,
 		chJournal: chInput,
 		//TODO: log: Logger
@@ -55,14 +41,14 @@ func New(filePath string) *Larder {
 }
 
 func (l *Larder) Start() {
-	if atomic.CompareAndSwapInt64(&l.hasp, stateStopped, stateStarted) {
+	if atomic.CompareAndSwapInt64(&l.hasp, stateStopped, stateStarted) { //TODO:
 		//		l.chStop = make(chan struct{})
 		//		go l.worker()
 	}
 }
 
 func (l *Larder) Stop() {
-	if atomic.CompareAndSwapInt64(&l.hasp, stateStarted, stateStopped) {
+	if atomic.CompareAndSwapInt64(&l.hasp, stateStarted, stateStopped) { //TODO:
 		//		l.chStop <- struct{}{}
 		//		<-l.chStop
 		//		return
@@ -91,7 +77,7 @@ func (l *Larder) Stop() {
 //	}
 //}
 
-func (l *Larder) Write(key string, value []byte) error { //TODO:
+func (l *Larder) Write(key string, value []byte) error {
 	if atomic.LoadInt64(&l.hasp) == stateStopped {
 		return fmt.Errorf("Adding is possible only when the application started")
 
@@ -138,16 +124,6 @@ func (l *Larder) Transaction(handlerName string, keys []string, v interface{}) e
 	l.journal.Write(toSave)
 	return nil
 }
-
-//func (l *Larder) doTransaction(req reqTransaction) {
-//	toSave, err := l.store.transaction(req.keys, req.v, req.handler)
-//	if err != nil {
-//		l.log.Write(err)
-//	} else {
-//		l.journal.Write(toSave)
-//		//l.chWal <- toSave
-//	}
-//}
 
 func (l *Larder) copyKeys(keys []string) []string {
 	keys2 := make([]string, 0, len(keys))
