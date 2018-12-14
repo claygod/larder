@@ -11,7 +11,7 @@ import (
 )
 
 /*
-Journal - transactions logs saver.
+Journal - transactions logs saver (WAL).
 */
 type Journal struct {
 	batcher      *batcher.Batcher
