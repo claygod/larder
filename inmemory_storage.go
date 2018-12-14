@@ -35,7 +35,7 @@ func (s *inMemoryStorage) setRecords(inArray map[string][]byte) {
 	s.repo.Set(inArray)
 }
 
-func (s *inMemoryStorage) transaction(keys []string, v interface{}, f func([]string, Repo, interface{}) error) error {
+func (s *inMemoryStorage) transaction(keys []string, v interface{}, f func([]string, Repo, interface{}) ([]byte, error)) ([]byte, error) {
 	s.mtx.Lock()
 	defer s.mtx.Unlock()
 	return f(keys, s.repo, v)
