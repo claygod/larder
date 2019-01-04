@@ -20,6 +20,7 @@ const (
 
 type Larder struct {
 	mtx       sync.Mutex
+	porter    Porter
 	handlers  *handlers
 	store     *inMemoryStorage
 	journal   *journal.Journal
@@ -28,10 +29,11 @@ type Larder struct {
 	hasp      int64
 }
 
-func New(filePath string) *Larder {
+func New(filePath string, porter Porter) *Larder {
 	chInput := make(chan []byte)
 	j := journal.New(filePath, mockAlarmHandle, chInput, 10)
 	return &Larder{
+		porter:    porter,
 		handlers:  newHandlers(),
 		store:     newStorage(repo.New()),
 		journal:   j,
@@ -82,18 +84,62 @@ func (l *Larder) Write(key string, value []byte) error {
 		return fmt.Errorf("Adding is possible only when the application started")
 
 	}
+	l.porter.Catch([]string{key})
+	defer l.porter.Throw([]string{key})
 	l.store.setRecords(map[string][]byte{key: value})
 	return nil
 }
 
-func (l *Larder) Read(key string) ([]byte, error) { //TODO:
-	return nil, nil
-}
+func (l *Larder) Writes(input map[string][]byte) error {
+	if atomic.LoadInt64(&l.hasp) == stateStopped {
+		return fmt.Errorf("Adding is possible only when the application started")
 
-func (l *Larder) Delete(key string) error { //TODO:
+	}
+	keys := l.getKeysFromArray(input)
+	l.porter.Catch(keys)
+	defer l.porter.Throw(keys)
+	l.store.setRecords(input)
 	return nil
 }
 
+func (l *Larder) Read(key string) ([]byte, error) {
+	if atomic.LoadInt64(&l.hasp) == stateStopped {
+		return nil, fmt.Errorf("Reading is possible only when the application started")
+
+	}
+	l.porter.Catch([]string{key})
+	defer l.porter.Throw([]string{key})
+	outs, err := l.store.getRecords([]string{key})
+	if err != nil {
+		return nil, err
+	}
+	return outs[key], nil
+}
+
+func (l *Larder) Reads(keys []string) (map[string][]byte, error) {
+	if atomic.LoadInt64(&l.hasp) == stateStopped {
+		return nil, fmt.Errorf("Reading is possible only when the application started")
+
+	}
+	l.porter.Catch(keys)
+	defer l.porter.Throw(keys)
+	return l.store.getRecords(keys)
+}
+
+func (l *Larder) Delete(key string) error {
+	if atomic.LoadInt64(&l.hasp) == stateStopped {
+		return fmt.Errorf("Deleting is possible only when the application started")
+
+	}
+	l.porter.Catch([]string{key})
+	defer l.porter.Throw([]string{key})
+	//TODO:
+	return nil
+}
+
+/*
+SetHandler - add handler. This can be done both before launch and during database operation.
+*/
 func (l *Larder) SetHandler(handlerName string, handlerMethod func([]string, Repo, interface{}) ([]byte, error)) error {
 	//	if atomic.LoadInt64(&l.hasp) == stateStarted {
 	//		return fmt.Errorf("Handles cannot be added while the application is running.")
@@ -113,6 +159,8 @@ func (l *Larder) Transaction(handlerName string, keys []string, v interface{}) e
 		return fmt.Errorf("Transaction is possible only when the application started")
 
 	}
+	l.porter.Catch(keys)
+	defer l.porter.Throw(keys)
 	hdl, err := l.handlers.get(handlerName)
 	if err != nil {
 		return err
@@ -123,20 +171,4 @@ func (l *Larder) Transaction(handlerName string, keys []string, v interface{}) e
 	}
 	l.journal.Write(toSave)
 	return nil
-}
-
-func (l *Larder) copyKeys(keys []string) []string {
-	keys2 := make([]string, 0, len(keys))
-	copy(keys2, keys)
-	return keys2
-}
-
-func (l *Larder) getHeader(keys []string) []string {
-	keys2 := make([]string, 0, len(keys))
-	copy(keys2, keys)
-	return keys2
-}
-
-func mockAlarmHandle(err error) {
-	panic(err)
 }
