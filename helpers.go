@@ -45,7 +45,7 @@ func mockAlarmHandle(err error) {
 }
 
 /*
-prepareOperationToLog - operationCode, operationSize(keySize and valueSize), operationSize(keySize and valueSize) ...
+prepareOperationToLog - operationCode, operationSize(keySize and valueSize), operationBody
 */
 func (l *Larder) prepareOperationToLog(codeOperation byte, key string, value []byte) ([]byte, error) {
 	var buf bytes.Buffer
