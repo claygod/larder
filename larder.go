@@ -87,6 +87,9 @@ func (l *Larder) Write(key string, value []byte) error {
 	l.porter.Catch([]string{key})
 	defer l.porter.Throw([]string{key})
 	l.store.setRecords(map[string][]byte{key: value})
+	//TODO: сформировать строку/строки для записи в WAL журнал
+	//TODO: записать в журнал подготовленную строку
+	//TODO: при ошибке записи в журнал откатить запись и вернуть ошибку
 	return nil
 }
 
@@ -99,6 +102,7 @@ func (l *Larder) Writes(input map[string][]byte) error {
 	l.porter.Catch(keys)
 	defer l.porter.Throw(keys)
 	l.store.setRecords(input)
+	//TODO: добавить по образцу предыдущего метода
 	return nil
 }
 
