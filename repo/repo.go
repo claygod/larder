@@ -51,7 +51,7 @@ func (r *RecordsRepo) Del(keys []string) error {
 	return errOut
 }
 
-func (r *RecordsRepo) Keys() []string { // Resource-intensive method
+func (r *RecordsRepo) Keys() []string { // Resource-intensive m//ethod
 	out := make([]string, 0, len(r.data))
 	for key, _ := range r.data {
 		out = append(out, key)
