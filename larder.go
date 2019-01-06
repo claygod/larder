@@ -33,9 +33,9 @@ type Larder struct {
 	hasp      int64
 }
 
-func New(filePath string, porter Porter) *Larder {
-	chInput := make(chan []byte)
-	j := journal.New(filePath, mockAlarmHandle, chInput, 10)
+func New(filePath string, porter Porter, batchSize int) *Larder {
+	chInput := make(chan []byte, 100)
+	j := journal.New(filePath, mockAlarmHandle, chInput, batchSize)
 	return &Larder{
 		porter:    porter,
 		handlers:  newHandlers(),
@@ -48,6 +48,7 @@ func New(filePath string, porter Porter) *Larder {
 
 func (l *Larder) Start() {
 	if atomic.CompareAndSwapInt64(&l.hasp, stateStopped, stateStarted) { //TODO:
+		//l.journal.Start()
 		//		l.chStop = make(chan struct{})
 		//		go l.worker()
 	}
@@ -58,6 +59,7 @@ func (l *Larder) Stop() {
 		//		l.chStop <- struct{}{}
 		//		<-l.chStop
 		//		return
+		//l.journal.Stop()
 	}
 }
 
