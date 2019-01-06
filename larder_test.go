@@ -8,13 +8,7 @@ import (
 	"strconv"
 	"testing"
 	"time"
-	//"encoding/binary"
-	//	"encoding/gob"
-	//	"fmt"
-	//	"sync"
-	//	"sync/atomic"
-	//	"github.com/claygod/larder/journal"
-	//	"github.com/claygod/larder/repo"
+
 	"github.com/claygod/tools/porter"
 )
 
@@ -39,7 +33,6 @@ func BenchmarkNewLarder(b *testing.B) {
 	p := porter.New()
 	lr := New("./wal2.txt", p, 1000)
 	lr.Start()
-	//defer lr.Stop()
 	u := 0
 	b.SetParallelism(64)
 	b.StartTimer()
@@ -51,14 +44,4 @@ func BenchmarkNewLarder(b *testing.B) {
 		}
 	})
 	defer lr.Stop()
-
-	//time.Sleep(3000 * time.Millisecond)
 }
-
-//func forTestGenReqs(lr *Larder) {
-//	dummy := make([]byte, 1000)
-//	for i := 0; i < 10000; i++ {
-//		lr.Write(strconv.Itoa(i), dummy)
-//		//time.Sleep(10 * time.Millisecond)
-//	}
-//}
