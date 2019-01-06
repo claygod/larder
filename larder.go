@@ -63,28 +63,6 @@ func (l *Larder) Stop() {
 	}
 }
 
-//func (l *Larder) worker() {
-//	defer close(l.chStop)
-//	for {
-//		select {
-//		case <-l.chStop:
-//			return
-//		default:
-//			select {
-//			case req := <-l.chTransaction:
-//				toSave, err := l.store.transaction(req.keys, req.v, req.handler)
-//				if err != nil {
-//					l.log.Write(err)
-//				} else {
-//					l.journal.Write(toSave)
-//				}
-//			case <-l.chStop:
-//				return
-//			}
-//		}
-//	}
-//}
-
 func (l *Larder) Write(key string, value []byte) error {
 	if atomic.LoadInt64(&l.hasp) != stateStarted {
 		return fmt.Errorf("Adding is possible only when the application started")
