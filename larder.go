@@ -5,6 +5,9 @@ package larder
 // Copyright © 2018 Eduard Sesigin. All rights reserved. Contacts: <claygod@yandex.ru>
 
 import (
+	"bytes"
+	//"encoding/binary"
+	"encoding/gob"
 	"fmt"
 	"sync"
 	"sync/atomic"
@@ -16,6 +19,7 @@ import (
 const (
 	stateStopped int64 = iota
 	stateStarted
+	statePanic
 )
 
 type Larder struct {
@@ -80,21 +84,46 @@ func (l *Larder) Stop() {
 //}
 
 func (l *Larder) Write(key string, value []byte) error {
-	if atomic.LoadInt64(&l.hasp) == stateStopped {
+	if atomic.LoadInt64(&l.hasp) != stateStarted {
 		return fmt.Errorf("Adding is possible only when the application started")
 
 	}
 	l.porter.Catch([]string{key})
 	defer l.porter.Throw([]string{key})
+	defer l.checkPanic()
+
 	l.store.setRecords(map[string][]byte{key: value})
+	// WAL
+	rw := reqWrite{
+		Key:   key,
+		Value: value,
+	}
+	var buf bytes.Buffer
+	if err := buf.WriteByte(codeWrite); err != nil { // write operation code to buf
+		return err
+	}
+	ge := gob.NewEncoder(&buf)
+	if err := ge.Encode(rw); err != nil { // write operation body to buf
+		return err
+	}
+	l.journal.Write(buf.Bytes())
+
+	//	ln := make([]byte, 8)
+	//	binary.LittleEndian.PutUint64(ln, uint64(buf.Len()))
+	//	n, err := buf.Write(ln)
+	//	if err != nil {
+	//		return err
+	//	} else if n != 8 {
+	//		return fmt.Errorf("8 bytes should have been written, not %d", n)
+	//	}
 	//TODO: сформировать строку/строки для записи в WAL журнал
 	//TODO: записать в журнал подготовленную строку
-	//TODO: при ошибке записи в журнал откатить запись и вернуть ошибку
+	//TODO: при ошибке записи в журнал там возможна паника, её перехватывать
 	return nil
 }
 
 func (l *Larder) Writes(input map[string][]byte) error {
-	if atomic.LoadInt64(&l.hasp) == stateStopped {
+	if atomic.LoadInt64(&l.hasp) != stateStarted {
 		return fmt.Errorf("Adding is possible only when the application started")
 
 	}
@@ -107,7 +136,7 @@ func (l *Larder) Writes(input map[string][]byte) error {
 }
 
 func (l *Larder) Read(key string) ([]byte, error) {
-	if atomic.LoadInt64(&l.hasp) == stateStopped {
+	if atomic.LoadInt64(&l.hasp) != stateStarted {
 		return nil, fmt.Errorf("Reading is possible only when the application started")
 
 	}
@@ -121,7 +150,7 @@ func (l *Larder) Read(key string) ([]byte, error) {
 }
 
 func (l *Larder) Reads(keys []string) (map[string][]byte, error) {
-	if atomic.LoadInt64(&l.hasp) == stateStopped {
+	if atomic.LoadInt64(&l.hasp) != stateStarted {
 		return nil, fmt.Errorf("Reading is possible only when the application started")
 
 	}
@@ -131,7 +160,7 @@ func (l *Larder) Reads(keys []string) (map[string][]byte, error) {
 }
 
 func (l *Larder) Delete(key string) error {
-	if atomic.LoadInt64(&l.hasp) == stateStopped {
+	if atomic.LoadInt64(&l.hasp) != stateStarted {
 		return fmt.Errorf("Deleting is possible only when the application started")
 
 	}
@@ -159,7 +188,7 @@ Arguments:
 - additional arguments
 */
 func (l *Larder) Transaction(handlerName string, keys []string, v interface{}) error {
-	if atomic.LoadInt64(&l.hasp) == stateStopped {
+	if atomic.LoadInt64(&l.hasp) != stateStarted {
 		return fmt.Errorf("Transaction is possible only when the application started")
 
 	}
@@ -175,4 +204,17 @@ func (l *Larder) Transaction(handlerName string, keys []string, v interface{}) e
 	}
 	l.journal.Write(toSave)
 	return nil
+}
+
+func (l *Larder) checkPanic() {
+	if err := recover(); err != nil {
+		atomic.StoreInt64(&l.hasp, statePanic)
+		fmt.Println(err)
+	}
+	//			func(){
+	//		if err := recover(); err != nil {
+	//			atomic.StoreInt64(&l.hasp, statePanic)
+	//			fmt.Println(err)
+	//		}
+	//	}
 }
