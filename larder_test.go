@@ -5,6 +5,8 @@ package larder
 // Copyright © 2018 Eduard Sesigin. All rights reserved. Contacts: <claygod@yandex.ru>
 
 import (
+	"os"
+	"path/filepath"
 	"strconv"
 	"testing"
 	"time"
@@ -16,7 +18,7 @@ func TestNewLarder(t *testing.T) {
 	dummy := make([]byte, 1000)
 
 	p := porter.New()
-	lr := New("./wal.txt", p, 1000)
+	lr := New("./log/", p, 1000)
 	lr.Start()
 	defer lr.Stop()
 	for i := 0; i < 10000; i++ {
@@ -24,6 +26,7 @@ func TestNewLarder(t *testing.T) {
 		//time.Sleep(10 * time.Millisecond)
 	}
 	time.Sleep(3000 * time.Millisecond)
+	forTestClearDir("./log/")
 }
 
 func BenchmarkNewLarderSequence(b *testing.B) {
@@ -31,7 +34,7 @@ func BenchmarkNewLarderSequence(b *testing.B) {
 	dummy := make([]byte, 1000)
 
 	p := porter.New()
-	lr := New("./wal2.txt", p, 10)
+	lr := New("./log/", p, 10)
 	lr.Start()
 	//b.SetParallelism(64)
 	b.StartTimer()
@@ -40,6 +43,8 @@ func BenchmarkNewLarderSequence(b *testing.B) {
 		lr.Write(strconv.Itoa(i), dummy)
 	}
 	defer lr.Stop()
+	forTestClearDir("./log/")
+	//time.Sleep(300 * time.Millisecond)
 }
 
 func BenchmarkNewLarderParallel(b *testing.B) {
@@ -47,7 +52,7 @@ func BenchmarkNewLarderParallel(b *testing.B) {
 	dummy := make([]byte, 1000)
 
 	p := porter.New()
-	lr := New("./wal3.txt", p, 1000)
+	lr := New("./log/", p, 1000)
 	lr.Start()
 	u := 0
 	b.SetParallelism(64)
@@ -60,4 +65,25 @@ func BenchmarkNewLarderParallel(b *testing.B) {
 		}
 	})
 	defer lr.Stop()
+	forTestClearDir("./log/")
+	//time.Sleep(300 * time.Millisecond)
+}
+
+func forTestClearDir(dir string) error {
+	d, err := os.Open(dir)
+	if err != nil {
+		return err
+	}
+	defer d.Close()
+	names, err := d.Readdirnames(-1)
+	if err != nil {
+		return err
+	}
+	for _, name := range names {
+		err = os.RemoveAll(filepath.Join(dir, name))
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
