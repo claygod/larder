@@ -5,9 +5,9 @@ package larder
 // Copyright © 2018 Eduard Sesigin. All rights reserved. Contacts: <claygod@yandex.ru>
 
 import (
-	"bytes"
+	//"bytes"
 	//"encoding/binary"
-	"encoding/gob"
+	//"encoding/gob"
 	"fmt"
 	"sync"
 	"sync/atomic"
@@ -68,37 +68,18 @@ func (l *Larder) Write(key string, value []byte) error {
 		return fmt.Errorf("Adding is possible only when the application started")
 
 	}
-	l.porter.Catch([]string{key})
-	defer l.porter.Throw([]string{key})
-	defer l.checkPanic()
+	l.porter.Catch([]string{key})       // хватаем нужные записи (локаем)
+	defer l.porter.Throw([]string{key}) // бросаем по завершению (unlock)
+	defer l.checkPanic()                // при ошибке записи в журнал там возможна паника, её перехватывать
 
+	// проводим операцию  с inmemory хранилищем
 	l.store.setRecords(map[string][]byte{key: value})
-	// WAL
-	rw := reqWrite{
-		Key:   key,
-		Value: value,
-	}
-	var buf bytes.Buffer
-	if err := buf.WriteByte(codeWrite); err != nil { // write operation code to buf
+	// WAL: сформируем строку/строки для записи в WAL и заполним журнал
+	rec, err := l.prepareWriteToLog(codeWrite, key, value)
+	if err != nil {
 		return err
 	}
-	ge := gob.NewEncoder(&buf)
-	if err := ge.Encode(rw); err != nil { // write operation body to buf
-		return err
-	}
-	l.journal.Write(buf.Bytes())
-
-	//	ln := make([]byte, 8)
-	//	binary.LittleEndian.PutUint64(ln, uint64(buf.Len()))
-	//	n, err := buf.Write(ln)
-	//	if err != nil {
-	//		return err
-	//	} else if n != 8 {
-	//		return fmt.Errorf("8 bytes should have been written, not %d", n)
-	//	}
-	//TODO: сформировать строку/строки для записи в WAL журнал
-	//TODO: записать в журнал подготовленную строку
-	//TODO: при ошибке записи в журнал там возможна паника, её перехватывать
+	l.journal.Write(append(uint64ToBytes(uint64(len(rec))), rec...))
 	return nil
 }
 
@@ -191,10 +172,4 @@ func (l *Larder) checkPanic() {
 		atomic.StoreInt64(&l.hasp, statePanic)
 		fmt.Println(err)
 	}
-	//			func(){
-	//		if err := recover(); err != nil {
-	//			atomic.StoreInt64(&l.hasp, statePanic)
-	//			fmt.Println(err)
-	//		}
-	//	}
 }

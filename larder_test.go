@@ -5,9 +5,12 @@ package larder
 // Copyright © 2018 Eduard Sesigin. All rights reserved. Contacts: <claygod@yandex.ru>
 
 import (
+	"fmt"
 	"os"
-	"path/filepath"
+
+	//"path/filepath"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -15,13 +18,13 @@ import (
 )
 
 func TestNewLarder(t *testing.T) {
-	dummy := make([]byte, 1000)
+	dummy := forTestGetDummy(10) //make([]byte, 1000)
 
 	p := porter.New()
-	lr := New("./log/", p, 1000)
+	lr := New("./log/", p, 10)
 	lr.Start()
 	defer lr.Stop()
-	for i := 0; i < 10000; i++ {
+	for i := 0; i < 10; i++ {
 		go lr.Write(strconv.Itoa(i), dummy)
 		//time.Sleep(10 * time.Millisecond)
 	}
@@ -31,7 +34,10 @@ func TestNewLarder(t *testing.T) {
 
 func BenchmarkNewLarderSequence(b *testing.B) {
 	b.StopTimer()
-	dummy := make([]byte, 1000)
+	dummy := forTestGetDummy(1000) //make([]byte, 1000)
+	for i := 0; i < 1000; i++ {
+		dummy[i] = 5
+	}
 
 	p := porter.New()
 	lr := New("./log/", p, 10)
@@ -49,7 +55,7 @@ func BenchmarkNewLarderSequence(b *testing.B) {
 
 func BenchmarkNewLarderParallel(b *testing.B) {
 	b.StopTimer()
-	dummy := make([]byte, 1000)
+	dummy := forTestGetDummy(1000) //make([]byte, 1000)
 
 	p := porter.New()
 	lr := New("./log/", p, 1000)
@@ -80,10 +86,22 @@ func forTestClearDir(dir string) error {
 		return err
 	}
 	for _, name := range names {
-		err = os.RemoveAll(filepath.Join(dir, name))
-		if err != nil {
-			return err
+		fmt.Println(name)
+		if strings.HasSuffix(name, ".log") {
+			//os.Remove(dir + name)
 		}
+		//		err = os.RemoveAll(filepath.Join(dir, name))
+		//		if err != nil {
+		//			return err
+		//		}
 	}
 	return nil
+}
+
+func forTestGetDummy(count int) []byte {
+	dummy := make([]byte, count)
+	for i := 0; i < count; i++ {
+		dummy[i] = 105
+	}
+	return dummy
 }

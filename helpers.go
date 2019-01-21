@@ -6,8 +6,10 @@ package larder
 
 import (
 	"bytes"
-	"encoding/binary"
+	//"encoding/binary"
+	"encoding/gob"
 	"fmt"
+	"unsafe"
 )
 
 const (
@@ -70,9 +72,9 @@ func (l *Larder) prepareOperationToLog(codeOperation byte, key string, value []b
 	var size uint64 = uint64(len([]byte(key)))
 	size = size << 48
 	size += uint64(len(value))
-	b2 := make([]byte, 8)
-	binary.LittleEndian.PutUint64(b2, uint64(size))
-	if _, err := buf.Write(b2); err != nil {
+	//	b2 := make([]byte, 8)
+	//	binary.LittleEndian.PutUint64(b2, uint64(size))
+	if _, err := buf.Write(uint64ToBytes(size)); err != nil {
 		return nil, err
 	}
 	// operation body
@@ -84,4 +86,76 @@ func (l *Larder) prepareOperationToLog(codeOperation byte, key string, value []b
 	}
 
 	return buf.Bytes(), nil
+}
+
+/*
+prepareRecordToLog -
+*/
+func (l *Larder) prepareRecordToLog(key string, value []byte) ([]byte, error) {
+	rw := reqWrite{
+		Key:   key,
+		Value: value,
+	}
+	var bufBody bytes.Buffer
+	ge := gob.NewEncoder(&bufBody)
+	if err := ge.Encode(rw); err != nil {
+		return nil, err
+	}
+
+	var buf bytes.Buffer
+	if _, err := buf.Write(uint64ToBytes(uint64(bufBody.Len()))); err != nil {
+		return nil, err
+	}
+	if _, err := buf.Write(bufBody.Bytes()); err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
+}
+
+/*
+prepareWriteToLog -
+*/
+func (l *Larder) prepareWriteToLog(code byte, key string, value []byte) ([]byte, error) {
+	rw := reqWrite{
+		Key:   key,
+		Value: value,
+	}
+	var bufBody bytes.Buffer
+	ge := gob.NewEncoder(&bufBody)
+	if err := ge.Encode(rw); err != nil {
+		return nil, err
+	}
+
+	var buf bytes.Buffer
+	if _, err := buf.Write(uint64ToBytes(uint64(bufBody.Len() + 1))); err != nil {
+		return nil, err
+	}
+	if err := buf.WriteByte(code); err != nil {
+		return nil, err
+	}
+	if _, err := buf.Write(bufBody.Bytes()); err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
+}
+
+func uint64ToBytes(i uint64) []byte {
+	//u := i
+	fmt.Println("--", i)
+	x := (*[8]byte)(unsafe.Pointer(&i))
+	fmt.Println(x)
+	//fmt.Println((*uint64)(unsafe.Pointer(&x)))
+	out := make([]byte, 0, 8)
+	out = append(out, x[:]...)
+	//fmt.Println(out)
+	return out
+
+	//	ln := make([]byte, 8)
+	//	binary.LittleEndian.PutUint64(ln, uint64(buf.Len()))
+	//	n, err := buf.Write(ln)
+	//	if err != nil {
+	//		return err
+	//	} else if n != 8 {
+	//		return fmt.Errorf("8 bytes should have been written, not %d", n)
+	//	}
 }
