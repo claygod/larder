@@ -140,14 +140,11 @@ func (l *Larder) prepareWriteToLog(code byte, key string, value []byte) ([]byte,
 }
 
 func uint64ToBytes(i uint64) []byte {
-	//u := i
-	fmt.Println("--", i)
+	//fmt.Println("--", i)
 	x := (*[8]byte)(unsafe.Pointer(&i))
-	fmt.Println(x)
-	//fmt.Println((*uint64)(unsafe.Pointer(&x)))
+	//fmt.Println(x)
 	out := make([]byte, 0, 8)
 	out = append(out, x[:]...)
-	//fmt.Println(out)
 	return out
 
 	//	ln := make([]byte, 8)
