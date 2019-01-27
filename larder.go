@@ -2,7 +2,7 @@ package larder
 
 // Larder
 // API
-// Copyright © 2018 Eduard Sesigin. All rights reserved. Contacts: <claygod@yandex.ru>
+// Copyright © 2018-2019 Eduard Sesigin. All rights reserved. Contacts: <claygod@yandex.ru>
 
 import (
 	//"bytes"
