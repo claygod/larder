@@ -8,6 +8,7 @@ import (
 	//"bytes"
 	//"encoding/binary"
 	//"encoding/gob"
+	"bytes"
 	"fmt"
 	"sync"
 	"sync/atomic"
@@ -22,6 +23,17 @@ const (
 	statePanic
 )
 
+/*
+Larder -
+
+Формат записей в лог:
+общая длина (int64)
+	Длина операции (int64), код операции (1 байт), тело операции
+	Длина операции (int64), код операции (1 байт), тело операции
+	. . .
+
+Важный вопрос: как будут храниться чекпойнты? Если полностью, то по поеданию места на харде это будет шляпа.
+*/
 type Larder struct {
 	mtx       sync.Mutex
 	porter    Porter
@@ -63,6 +75,9 @@ func (l *Larder) Stop() {
 	}
 }
 
+/*
+Write - записать ОДНУ запись в базу
+*/
 func (l *Larder) Write(key string, value []byte) error {
 	if atomic.LoadInt64(&l.hasp) != stateStarted {
 		return fmt.Errorf("Adding is possible only when the application started")
@@ -83,6 +98,11 @@ func (l *Larder) Write(key string, value []byte) error {
 	return nil
 }
 
+/*
+Writes
+Важный момент - получая на вход мэп, мы гарантируем,
+что не будет две записи в один и тот же ключ.
+*/
 func (l *Larder) Writes(input map[string][]byte) error {
 	if atomic.LoadInt64(&l.hasp) != stateStarted {
 		return fmt.Errorf("Adding is possible only when the application started")
@@ -91,8 +111,22 @@ func (l *Larder) Writes(input map[string][]byte) error {
 	keys := l.getKeysFromArray(input)
 	l.porter.Catch(keys)
 	defer l.porter.Throw(keys)
+
+	// проводим операцию  с inmemory хранилищем
 	l.store.setRecords(input)
+
 	//TODO: добавить по образцу предыдущего метода
+	recs := make([][]byte, 0, len(input))
+	lenRecs := 0
+	for _, key := range keys {
+		rec, err := l.prepareWriteToLog(codeWrite, key, input[key])
+		if err != nil {
+			return err
+		}
+		recs = append(recs, rec)
+		lenRecs += len(rec)
+	}
+	l.journal.Write(append(uint64ToBytes(uint64(lenRecs)), bytes.Join(recs, []byte{})...))
 	return nil
 }
 

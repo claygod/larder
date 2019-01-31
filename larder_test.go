@@ -17,6 +17,34 @@ import (
 	"github.com/claygod/tools/porter"
 )
 
+func TestFillDefault(t *testing.T) {
+	l := &Larder{}
+	f, err := os.Create("./log/checkpoint1.db")
+	if err != nil {
+		t.Error(err)
+	}
+
+	for i := 0; i < 10; i++ {
+		bArr, err := l.prepareRecordToCheckpoint("key"+strconv.Itoa(i), make([]byte, 100)) //[]byte("iiiiiiiiiiiiiii"
+		if err != nil {
+			t.Error(err)
+		}
+		_, err = f.Write(bArr)
+		if err != nil {
+			t.Error(err)
+		}
+	}
+	f.Close()
+
+}
+
+func TestLoadDefault(t *testing.T) {
+	l := &Larder{}
+	f, _ := os.Open("./log/checkpoint1.db")
+	l.loadRecordsFromCheckpoint(f)
+	f.Close()
+}
+
 func TestNewLarder(t *testing.T) {
 	dummy := forTestGetDummy(10) //make([]byte, 1000)
 
