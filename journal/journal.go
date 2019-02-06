@@ -9,11 +9,14 @@ import (
 	// "fmt"
 	"strconv"
 	"sync"
+
 	//"sync/atomic"
 	"time"
 
 	"github.com/claygod/tools/batcher"
 )
+
+const limitRecordsPerLogfile int64 = 100000
 
 /*
 Journal - transactions logs saver (WAL).
@@ -47,10 +50,14 @@ func (j *Journal) Write(toSave []byte) {
 	}
 }
 
+func (j *Journal) Close() {
+	j.client.Close()
+}
+
 func (j *Journal) getClient() (*batcher.Client, error) {
 	j.m.Lock()
 	defer j.m.Unlock()
-	if j.counter > 100000 {
+	if j.counter > limitRecordsPerLogfile {
 		clt, err := batcher.Open(getNewFileName(j.dirPath), j.batchSize)
 		if err != nil {
 			return nil, err

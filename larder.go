@@ -13,6 +13,8 @@ import (
 	"sync"
 	"sync/atomic"
 
+	_ "net/http/pprof"
+
 	"github.com/claygod/larder/journal"
 	"github.com/claygod/larder/repo"
 )
@@ -35,43 +37,44 @@ Larder -
 Важный вопрос: как будут храниться чекпойнты? Если полностью, то по поеданию места на харде это будет шляпа.
 */
 type Larder struct {
-	mtx       sync.Mutex
-	porter    Porter
-	handlers  *handlers
-	store     *inMemoryStorage
-	journal   *journal.Journal
-	chJournal chan []byte
+	mtx      sync.Mutex
+	porter   Porter
+	handlers *handlers
+	store    *inMemoryStorage
+	journal  *journal.Journal
+	//chJournal chan []byte
 	chStop    chan struct{}
+	filePath  string
+	batchSize int
 	hasp      int64
 }
 
 func New(filePath string, porter Porter, batchSize int) *Larder {
-	chInput := make(chan []byte, 100)
-	j := journal.New(filePath, mockAlarmHandle, chInput, batchSize)
+	//chInput := make(chan []byte, 100)
+	//j := journal.New(filePath, mockAlarmHandle, nil, batchSize)
 	return &Larder{
-		porter:    porter,
-		handlers:  newHandlers(),
-		store:     newStorage(repo.New()),
-		journal:   j,
-		chJournal: chInput,
+		porter:   porter,
+		handlers: newHandlers(),
+		store:    newStorage(repo.New()),
+		//journal:  j,
+		//chJournal: chInput,
+		filePath:  filePath,
+		batchSize: batchSize,
 		//TODO: log: Logger
 	}
 }
 
 func (l *Larder) Start() {
 	if atomic.CompareAndSwapInt64(&l.hasp, stateStopped, stateStarted) { //TODO:
+		//chInput := make(chan []byte, 100)
+		l.journal = journal.New(l.filePath, mockAlarmHandle, nil, l.batchSize)
 		//l.journal.Start()
-		//		l.chStop = make(chan struct{})
-		//		go l.worker()
 	}
 }
 
 func (l *Larder) Stop() {
 	if atomic.CompareAndSwapInt64(&l.hasp, stateStarted, stateStopped) { //TODO:
-		//		l.chStop <- struct{}{}
-		//		<-l.chStop
-		//		return
-		//l.journal.Stop()
+		l.journal.Close()
 	}
 }
 
@@ -94,16 +97,18 @@ func (l *Larder) Write(key string, value []byte) error {
 	if err != nil {
 		return err
 	}
+	rec[0] = 0
+	//xxx := append(uint64ToBytes(uint64(len(rec))), rec...)
 	l.journal.Write(append(uint64ToBytes(uint64(len(rec))), rec...))
 	return nil
 }
 
 /*
-Writes
+WriteList
 Важный момент - получая на вход мэп, мы гарантируем,
 что не будет две записи в один и тот же ключ.
 */
-func (l *Larder) Writes(input map[string][]byte) error {
+func (l *Larder) WriteList(input map[string][]byte) error {
 	if atomic.LoadInt64(&l.hasp) != stateStarted {
 		return fmt.Errorf("Adding is possible only when the application started")
 
@@ -115,7 +120,7 @@ func (l *Larder) Writes(input map[string][]byte) error {
 	// проводим операцию  с inmemory хранилищем
 	l.store.setRecords(input)
 
-	//TODO: добавить по образцу предыдущего метода
+	//WAL
 	recs := make([][]byte, 0, len(input))
 	lenRecs := 0
 	for _, key := range keys {
@@ -144,7 +149,7 @@ func (l *Larder) Read(key string) ([]byte, error) {
 	return outs[key], nil
 }
 
-func (l *Larder) Reads(keys []string) (map[string][]byte, error) {
+func (l *Larder) ReadList(keys []string) (map[string][]byte, error) {
 	if atomic.LoadInt64(&l.hasp) != stateStarted {
 		return nil, fmt.Errorf("Reading is possible only when the application started")
 

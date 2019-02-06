@@ -5,91 +5,123 @@ package larder
 // Copyright © 2018 Eduard Sesigin. All rights reserved. Contacts: <claygod@yandex.ru>
 
 import (
-	"fmt"
+	//"fmt"
+	//"log"
 	"os"
 
 	//"path/filepath"
+	"runtime/pprof"
 	"strconv"
 	"strings"
 	"testing"
-	"time"
+
+	//"time"
 
 	"github.com/claygod/tools/porter"
 )
 
-func TestFillDefault(t *testing.T) {
-	l := &Larder{}
-	f, err := os.Create("./log/checkpoint1.db")
-	if err != nil {
-		t.Error(err)
-	}
+// func TestFillDefault(t *testing.T) {
+// 	l := &Larder{}
+// 	f, err := os.Create("./log/checkpoint1.db")
+// 	if err != nil {
+// 		t.Error(err)
+// 	}
+// 	defer f.Close()
+// 	// single
+// 	for i := 0; i < 10; i++ {
+// 		bArr, err := l.prepareRecordToCheckpoint("key"+strconv.Itoa(i), make([]byte, 10)) //[]byte("iiiiiiiiiiiiiii"
+// 		if err != nil {
+// 			t.Error(err)
+// 		}
+// 		_, err = f.Write(bArr)
+// 		if err != nil {
+// 			t.Error(err)
+// 		}
+// 	}
 
-	for i := 0; i < 10; i++ {
-		bArr, err := l.prepareRecordToCheckpoint("key"+strconv.Itoa(i), make([]byte, 100)) //[]byte("iiiiiiiiiiiiiii"
-		if err != nil {
-			t.Error(err)
-		}
-		_, err = f.Write(bArr)
-		if err != nil {
-			t.Error(err)
-		}
-	}
-	f.Close()
+// }
 
-}
+// func TestLoadDefault(t *testing.T) {
+// 	l := &Larder{}
+// 	f, _ := os.Open("./log/checkpoint1.db")
+// 	l.loadRecordsFromCheckpoint(f)
+// 	f.Close()
+// }
 
-func TestLoadDefault(t *testing.T) {
-	l := &Larder{}
-	f, _ := os.Open("./log/checkpoint1.db")
-	l.loadRecordsFromCheckpoint(f)
-	f.Close()
-}
+// func TestNewLarder(t *testing.T) {
+// 	forTestClearDir("./log/")
+// 	dummy := forTestGetDummy(10) //make([]byte, 1000)
 
-func TestNewLarder(t *testing.T) {
-	dummy := forTestGetDummy(10) //make([]byte, 1000)
+// 	p := porter.New()
+// 	lr := New("./log/", p, 10)
+// 	lr.Start()
+// 	defer lr.Stop()
 
+// 	// single
+// 	for i := 0; i < 10; i++ {
+// 		go lr.Write(strconv.Itoa(i), dummy)
+// 		//time.Sleep(10 * time.Millisecond)
+// 	}
+
+// 	// list
+// 	list := make(map[string][]byte)
+// 	for i := 20; i < 30; i++ {
+// 		list["key"+strconv.Itoa(i)] = make([]byte, 10)
+// 	}
+// 	go lr.WriteList(list)
+
+// 	time.Sleep(3000 * time.Millisecond)
+// }
+
+func BenchmarkNewLarderParallel1(b *testing.B) {
+	b.StopTimer()
+	forTestClearDir("./log/")
+	dummy := forTestGetDummy(100) //make([]byte, 1000)
 	p := porter.New()
-	lr := New("./log/", p, 10)
+	lr := New("./log/", p, 2000)
 	lr.Start()
 	defer lr.Stop()
-	for i := 0; i < 10; i++ {
-		go lr.Write(strconv.Itoa(i), dummy)
-		//time.Sleep(10 * time.Millisecond)
-	}
-	time.Sleep(3000 * time.Millisecond)
-	forTestClearDir("./log/")
-}
-
-func BenchmarkNewLarderSequence(b *testing.B) {
-	b.StopTimer()
-	dummy := forTestGetDummy(1000) //make([]byte, 1000)
-	for i := 0; i < 1000; i++ {
-		dummy[i] = 5
-	}
-
-	p := porter.New()
-	lr := New("./log/", p, 10)
-	lr.Start()
-	//b.SetParallelism(64)
+	u := 0
+	// f, err := os.Create("cpu.txt")
+	// if err != nil {
+	// 	log.Fatal("could not create CPU profile: ", err)
+	// }
+	// if err := pprof.StartCPUProfile(f); err != nil {
+	// 	log.Fatal("could not start CPU profile: ", err)
+	// }
+	// defer pprof.StopCPUProfile()
+	b.SetParallelism(256)
 	b.StartTimer()
 
-	for i := 0; i < b.N; i++ {
-		lr.Write(strconv.Itoa(i), dummy)
-	}
-	defer lr.Stop()
-	forTestClearDir("./log/")
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			//lr.Write(strconv.Itoa(u), dummy)
+			lr.journal.Write(dummy)
+			u++
+		}
+	})
 	//time.Sleep(300 * time.Millisecond)
 }
 
-func BenchmarkNewLarderParallel(b *testing.B) {
+// go tool pprof -web ./larder.test ./cpu.txt
+func BenchmarkNewLarderParallel2(b *testing.B) {
 	b.StopTimer()
-	dummy := forTestGetDummy(1000) //make([]byte, 1000)
-
+	forTestClearDir("./log/")
+	dummy := forTestGetDummy(100) //make([]byte, 1000)
 	p := porter.New()
-	lr := New("./log/", p, 1000)
+	lr := New("./log/", p, 2000)
 	lr.Start()
+	defer lr.Stop()
 	u := 0
-	b.SetParallelism(64)
+	// f, err := os.Create("cpu.txt")
+	// if err != nil {
+	// 	log.Fatal("could not create CPU profile: ", err)
+	// }
+	// if err := pprof.StartCPUProfile(f); err != nil {
+	// 	log.Fatal("could not start CPU profile: ", err)
+	// }
+	defer pprof.StopCPUProfile()
+	b.SetParallelism(256)
 	b.StartTimer()
 
 	b.RunParallel(func(pb *testing.PB) {
@@ -98,8 +130,25 @@ func BenchmarkNewLarderParallel(b *testing.B) {
 			u++
 		}
 	})
-	defer lr.Stop()
+	//time.Sleep(300 * time.Millisecond)
+}
+
+func BenchmarkNewLarderSequence(b *testing.B) {
+	b.StopTimer()
 	forTestClearDir("./log/")
+	dummy := forTestGetDummy(100) //make([]byte, 1000)
+
+	p := porter.New()
+	lr := New("./log/", p, 2000)
+	lr.Start()
+	defer lr.Stop()
+	//b.SetParallelism(64)
+	b.StartTimer()
+
+	for i := 0; i < b.N; i++ {
+		lr.Write(strconv.Itoa(i), dummy)
+	}
+
 	//time.Sleep(300 * time.Millisecond)
 }
 
@@ -114,9 +163,9 @@ func forTestClearDir(dir string) error {
 		return err
 	}
 	for _, name := range names {
-		fmt.Println(name)
+		//fmt.Println(name)
 		if strings.HasSuffix(name, ".log") {
-			//os.Remove(dir + name)
+			os.Remove(dir + name)
 		}
 		//		err = os.RemoveAll(filepath.Join(dir, name))
 		//		if err != nil {
