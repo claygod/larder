@@ -116,6 +116,7 @@ func (l *Larder) WriteList(input map[string][]byte) error {
 	keys := l.getKeysFromArray(input)
 	l.porter.Catch(keys)
 	defer l.porter.Throw(keys)
+	defer l.checkPanic() // при ошибке записи в журнал там возможна паника, её перехватывать
 
 	// проводим операцию  с inmemory хранилищем
 	l.store.setRecords(input)
