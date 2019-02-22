@@ -32,12 +32,6 @@ type reqTransaction struct {
 	Value       interface{}
 }
 
-//type reqAdd struct {
-// key string
-// value []byte
-// responseChan chan error
-//}
-
 //type resTransaction struct {
 // value []byte
 // err error
