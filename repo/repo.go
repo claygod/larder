@@ -39,6 +39,10 @@ func (r *RecordsRepo) Set(inArray map[string][]byte) {
 	}
 }
 
+func (r *RecordsRepo) SetOne(key string, value []byte) {
+	r.data[key] = value
+}
+
 func (r *RecordsRepo) Del(keys []string) error {
 	var errOut error
 	for _, key := range keys {

@@ -7,6 +7,7 @@ package larder
 type Repo interface {
 	Get([]string) (map[string][]byte, error)
 	Set(map[string][]byte)
+	SetOne(string, []byte)
 	Del([]string) error
 	Keys() []string
 	Len() int
