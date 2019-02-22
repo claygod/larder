@@ -5,30 +5,40 @@ package larder
 // Copyright © 2018-2019 Eduard Sesigin. All rights reserved. Contacts: <claygod@yandex.ru>
 
 type reqWrite struct {
+	Time  int64
 	Key   string
 	Value []byte
-	// responseChan chan error
+}
+
+type reqWriteList struct {
+	Time int64
+	List map[string][]byte
+}
+
+type reqDelete struct {
+	Time int64
+	Key  string
+}
+
+type reqDeleteList struct {
+	Time int64
+	Keys []string
+}
+
+type reqTransaction struct {
+	Time        int64
+	HandlerName string
+	Keys        []string
+	Value       interface{}
 }
 
 //type reqAdd struct {
-//	key          string
-//	value        []byte
-//	responseChan chan error
-//}
-
-//type reqDelete struct {
-//	key          string
-//	responseChan chan error
-//}
-
-//type reqTransaction struct {
-//	keys    []string
-//	v       interface{}
-//	resChan chan *resTransaction
-//	handler func([]string, Repo, interface{}) ([]byte, error)
+// key string
+// value []byte
+// responseChan chan error
 //}
 
 //type resTransaction struct {
-//	value []byte
-//	err   error
+// value []byte
+// err error
 //}
