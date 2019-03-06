@@ -35,9 +35,18 @@ Larder -
 	. . .
 
 Важный вопрос: как будут храниться чекпойнты? Если полностью, то по поеданию места на харде это будет шляпа.
+
+Ещё одна тема с порядком сохранения изменений записей в лог: вполне может случиться так, что две прилетевшие записи
+обгонят одна другую и в батч попадут вторая перед первой. Однако эти операции будут касаться разных групп записей,
+так как произойдёт блокировка через "портье", поэтому при общем упорядочивании операций по номеру счётчика
+ничего плохого случиться не должно.
+С другой стороны, пока запись в лог не произошла, портье не освободит ключи, и поэтому касаемые этих записей
+другие изменения будут ВСЕГДА позже в логе, и это позволяет быть спокойным за хронологию изменений какой-либо конкретной
+записи или группы записей.
 */
 type Larder struct {
 	mtx      sync.Mutex
+	counter  *counter //TODO: надобность счётчика под большим вопросом
 	porter   Porter
 	handlers *handlers
 	store    *inMemoryStorage
@@ -53,6 +62,7 @@ func New(filePath string, porter Porter, batchSize int) *Larder {
 	//chInput := make(chan []byte, 100)
 	//j := journal.New(filePath, mockAlarmHandle, nil, batchSize)
 	return &Larder{
+		counter:  newCounter(), //TODO значение счётчика надо устанавливать исходя из процесса загрузки
 		porter:   porter,
 		handlers: newHandlers(),
 		store:    newStorage(repo.New()),
@@ -99,6 +109,8 @@ func (l *Larder) Write(key string, value []byte) error {
 	}
 	rec[0] = 0
 	//xxx := append(uint64ToBytes(uint64(len(rec))), rec...)
+	//TODO: необходимо в запись лога добавлять счётчик?
+	//TODO: необходимо в запись лога добавлять дату и/или время?
 	l.journal.Write(append(uint64ToBytes(uint64(len(rec))), rec...))
 	return nil
 }
@@ -199,10 +211,14 @@ func (l *Larder) Transaction(handlerName string, keys []string, v interface{}) e
 	if err != nil {
 		return err
 	}
-	toSave, err := l.store.transaction(keys, v, hdl)
+	// проводим операцию  с inmemory хранилищем
+	toSave, err := l.store.transaction(keys, v, hdl) //TODO: тут нужно возвращать map[key]value с новыми значениями
 	if err != nil {
 		return err //l.log.Write(err)
 	}
+	//WAL
+	//TODO: сохранение изменённых записей (полученных после выполнения транзакции)
+	//TODO: сохранение аргументов транцакции, на основании которых сделаны изменения
 	l.journal.Write(toSave)
 	return nil
 }
