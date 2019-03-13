@@ -6,25 +6,12 @@ package larder
 
 import (
 	"bytes"
-	"io"
-
-	//"runtime"
-	//"io/ioutil"
-	//"encoding/binary"
 	"encoding/gob"
 	"fmt"
+	"io"
 	"os"
+	"sync/atomic"
 	"unsafe"
-)
-
-const (
-	maxKeyLength   int = int(uint64(1)<<16) - 1
-	maxValueLength int = int(uint64(1)<<48) - 1
-)
-
-const (
-	codeWrite byte = iota
-	codeTransaction
 )
 
 func (l *Larder) getKeysFromArray(arr map[string][]byte) []string {
@@ -35,11 +22,11 @@ func (l *Larder) getKeysFromArray(arr map[string][]byte) []string {
 	return keys
 }
 
-func (l *Larder) copyKeys(keys []string) []string {
-	keys2 := make([]string, 0, len(keys))
-	copy(keys2, keys)
-	return keys2
-}
+// func (l *Larder) copyKeys(keys []string) []string {
+// 	keys2 := make([]string, 0, len(keys))
+// 	copy(keys2, keys)
+// 	return keys2
+// }
 
 func (l *Larder) getHeader(keys []string) []string {
 	keys2 := make([]string, 0, len(keys))
@@ -47,88 +34,88 @@ func (l *Larder) getHeader(keys []string) []string {
 	return keys2
 }
 
-func mockAlarmHandle(err error) {
+func mockAlarmHandle(err error) { //TODO: возможно, тут будет передаваться логгер
 	panic(err)
 }
 
-/*
-prepareOperationToLog - operationCode, operationSize(keySize and valueSize), operationBody
-*/
-func (l *Larder) prepareOperationToLog(codeOperation byte, key string, value []byte) ([]byte, error) {
-	var buf bytes.Buffer
-	if len(key) > maxKeyLength {
-		return nil, fmt.Errorf("Key length %d is greater than permissible %d", len(key), maxKeyLength)
-	}
-	if len(value) > maxValueLength {
-		return nil, fmt.Errorf("Value length %d is greater than permissible %d", len(value), maxValueLength)
-	}
+// /*
+// prepareOperationToLog - operationCode, operationSize(keySize and valueSize), operationBody
+// */
+// func (l *Larder) prepareOperationToLog(codeOperation byte, key string, value []byte) ([]byte, error) {
+// 	var buf bytes.Buffer
+// 	if len(key) > maxKeyLength {
+// 		return nil, fmt.Errorf("Key length %d is greater than permissible %d", len(key), maxKeyLength)
+// 	}
+// 	if len(value) > maxValueLength {
+// 		return nil, fmt.Errorf("Value length %d is greater than permissible %d", len(value), maxValueLength)
+// 	}
 
-	// code
-	if err := buf.WriteByte(codeOperation); err != nil {
-		return nil, err
-	}
-	// total size
-	//	b1 := make([]byte, 8)
-	//	binary.LittleEndian.PutUint64(b1, uint64(len([]byte(key))+len(value))) //i = int64(binary.LittleEndian.Uint64(b))
-	//	if _, err := buf.Write(b1); err != nil {
-	//		return nil, err
-	//	}
-	// operation size
-	var size uint64 = uint64(len([]byte(value)))
-	size = size << 16
-	size += uint64(len(key))
-	//	b2 := make([]byte, 8)
-	//	binary.LittleEndian.PutUint64(b2, uint64(size))
-	if _, err := buf.Write(uint64ToBytes(size)); err != nil {
-		return nil, err
-	}
-	// operation body
-	if _, err := buf.Write([]byte(key)); err != nil {
-		return nil, err
-	}
-	if _, err := buf.Write(value); err != nil {
-		return nil, err
-	}
+// 	// code
+// 	if err := buf.WriteByte(codeOperation); err != nil {
+// 		return nil, err
+// 	}
+// 	// total size
+// 	//	b1 := make([]byte, 8)
+// 	//	binary.LittleEndian.PutUint64(b1, uint64(len([]byte(key))+len(value))) //i = int64(binary.LittleEndian.Uint64(b))
+// 	//	if _, err := buf.Write(b1); err != nil {
+// 	//		return nil, err
+// 	//	}
+// 	// operation size
+// 	var size uint64 = uint64(len([]byte(value)))
+// 	size = size << 16
+// 	size += uint64(len(key))
+// 	//	b2 := make([]byte, 8)
+// 	//	binary.LittleEndian.PutUint64(b2, uint64(size))
+// 	if _, err := buf.Write(uint64ToBytes(size)); err != nil {
+// 		return nil, err
+// 	}
+// 	// operation body
+// 	if _, err := buf.Write([]byte(key)); err != nil {
+// 		return nil, err
+// 	}
+// 	if _, err := buf.Write(value); err != nil {
+// 		return nil, err
+// 	}
 
-	return buf.Bytes(), nil
-}
+// 	return buf.Bytes(), nil
+// }
 
-/*
-prepareRecordToCheckpoint -
-*/
-func (l *Larder) prepareRecordToCheckpoint(key string, value []byte) ([]byte, error) {
-	if len(key) > maxKeyLength {
-		return nil, fmt.Errorf("Key length %d is greater than permissible %d", len(key), maxKeyLength)
-	}
-	if len(value) > maxValueLength {
-		return nil, fmt.Errorf("Value length %d is greater than permissible %d", len(value), maxValueLength)
-	}
+// /*
+// prepareRecordToCheckpoint -
+// */
+// func (l *Larder) prepareRecordToCheckpoint(key string, value []byte) ([]byte, error) {
+// 	if len(key) > maxKeyLength {
+// 		return nil, fmt.Errorf("Key length %d is greater than permissible %d", len(key), maxKeyLength)
+// 	}
+// 	if len(value) > maxValueLength {
+// 		return nil, fmt.Errorf("Value length %d is greater than permissible %d", len(value), maxValueLength)
+// 	}
 
-	var size uint64 = uint64(len([]byte(value)))
-	size = size << 16
-	size += uint64(len(key))
+// 	var size uint64 = uint64(len([]byte(value)))
+// 	size = size << 16
+// 	size += uint64(len(key))
 
-	return append(uint64ToBytes(size), (append([]byte(key), value...))...), nil
+// 	return append(uint64ToBytes(size), (append([]byte(key), value...))...), nil
 
-	//	rw := reqWrite{
-	//		Key:   key,
-	//		Value: value,
-	//	}
-	//	var bufBody bytes.Buffer
-	//	ge := gob.NewEncoder(&bufBody)
-	//	if err := ge.Encode(rw); err != nil {
-	//		return nil, err
-	//	}
+// 	//	rw := reqWrite{
+// 	//		Key:   key,
+// 	//		Value: value,
+// 	//	}
+// 	//	var bufBody bytes.Buffer
+// 	//	ge := gob.NewEncoder(&bufBody)
+// 	//	if err := ge.Encode(rw); err != nil {
+// 	//		return nil, err
+// 	//	}
 
-	//	var buf bytes.Buffer
-	//	if _, err := buf.Write(uint64ToBytes(uint64(bufBody.Len()))); err != nil {
-	//		return nil, err
-	//	}
-	//	if _, err := buf.Write(bufBody.Bytes()); err != nil {
-	//		return nil, err
-	//	}
-	//	return buf.Bytes(), nil
-}
+// 	//	var buf bytes.Buffer
+// 	//	if _, err := buf.Write(uint64ToBytes(uint64(bufBody.Len()))); err != nil {
+// 	//		return nil, err
+// 	//	}
+// 	//	if _, err := buf.Write(bufBody.Bytes()); err != nil {
+// 	//		return nil, err
+// 	//	}
+// 	//	return buf.Bytes(), nil
+// }
 
 func (l *Larder) loadRecordsFromCheckpoint(f *os.File) error {
 	rSize := make([]byte, 8)
@@ -201,28 +188,42 @@ func (l *Larder) prepareRecordToLog(key string, value []byte) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-/*
-prepareWriteToLog -
-*/
-func (l *Larder) prepareWriteToLog(code byte, key string, value []byte) ([]byte, error) {
-	rw := reqWrite{
-		Key:   key,
-		Value: value,
-	}
-	var bufBody bytes.Buffer
-	ge := gob.NewEncoder(&bufBody)
-	if err := ge.Encode(rw); err != nil {
-		return nil, err
-	}
+// /*
+// prepareWriteToLog -
+// */
+// func (l *Larder) prepareWriteToLog(code byte, key string, value []byte) ([]byte, error) {
+// 	rw := reqWrite{
+// 		Key:   key,
+// 		Value: value,
+// 	}
+// 	var bufBody bytes.Buffer
+// 	ge := gob.NewEncoder(&bufBody)
+// 	if err := ge.Encode(rw); err != nil {
+// 		return nil, err
+// 	}
 
+// 	var buf bytes.Buffer
+// 	if _, err := buf.Write(uint64ToBytes(uint64(bufBody.Len() + 1))); err != nil {
+// 		return nil, err
+// 	}
+// 	if err := buf.WriteByte(code); err != nil {
+// 		return nil, err
+// 	}
+// 	if _, err := buf.Write(bufBody.Bytes()); err != nil {
+// 		return nil, err
+// 	}
+// 	return buf.Bytes(), nil
+// }
+
+func (l *Larder) prepareOperatToLog(code byte, value []byte) ([]byte, error) {
 	var buf bytes.Buffer
-	if _, err := buf.Write(uint64ToBytes(uint64(bufBody.Len() + 1))); err != nil {
+	if _, err := buf.Write(uint64ToBytes(uint64(len(value) + 1))); err != nil {
 		return nil, err
 	}
 	if err := buf.WriteByte(code); err != nil {
 		return nil, err
 	}
-	if _, err := buf.Write(bufBody.Bytes()); err != nil {
+	if _, err := buf.Write(value); err != nil {
 		return nil, err
 	}
 	return buf.Bytes(), nil
@@ -248,4 +249,28 @@ func bytesTUint64(b []byte) uint64 {
 	var x [8]byte
 	copy(x[:], b[:])
 	return *(*uint64)(unsafe.Pointer(&x))
+}
+
+func (l *Larder) checkPanic() {
+	if err := recover(); err != nil {
+		atomic.StoreInt64(&l.hasp, statePanic)
+		fmt.Println(err)
+	}
+}
+
+/*
+writeOperation - получаем сериализованный запрос и записываем его
+*/
+func (l *Larder) writeOperation(req interface{}, code byte) error {
+	var reqBuf bytes.Buffer
+	enc := gob.NewEncoder(&reqBuf)
+	if err := enc.Encode(req); err != nil {
+		return err
+	}
+	toSaveLog, err := l.prepareOperatToLog(code, reqBuf.Bytes())
+	if err != nil {
+		return err
+	}
+	l.journal.Write(toSaveLog)
+	return nil
 }
