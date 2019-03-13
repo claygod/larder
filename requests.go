@@ -15,10 +15,10 @@ type reqWriteList struct {
 	List map[string][]byte
 }
 
-type reqDelete struct {
-	Time int64
-	Key  string
-}
+// type reqDelete struct {
+// 	Time int64
+// 	Key  string
+// }
 
 type reqDeleteList struct {
 	Time int64
