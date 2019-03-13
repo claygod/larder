@@ -39,6 +39,12 @@ func (s *inMemoryStorage) setRecords(inArray map[string][]byte) {
 	s.repo.Set(inArray)
 }
 
+func (s *inMemoryStorage) delRecords(keys []string) error {
+	s.mtx.Lock()
+	defer s.mtx.Unlock()
+	return s.repo.Del(keys)
+}
+
 func (s *inMemoryStorage) setUnsafeRecord(key string, value []byte) {
 	s.repo.SetOne(key, value)
 }
