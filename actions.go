@@ -16,6 +16,15 @@ import (
 Write - записать ОДНУ запись в базу
 */
 func (l *Larder) Write(key string, value []byte) error {
+	// if atomic.LoadInt64(&l.hasp) != stateStarted {
+	// 	return fmt.Errorf("Adding is possible only when the application started")
+
+	// }
+
+	// size := len(key) + len(value)
+	// if !l.resControl.GetPermission(int64(size)) {
+	// 	return fmt.Errorf("Insufficient resources (memory, disk)")
+	// }
 	return l.WriteList(map[string][]byte{key: value})
 	// if atomic.LoadInt64(&l.hasp) != stateStarted {
 	// 	return fmt.Errorf("Adding is possible only when the application started")
@@ -43,21 +52,41 @@ WriteList
 func (l *Larder) WriteList(input map[string][]byte) error {
 	if atomic.LoadInt64(&l.hasp) != stateStarted {
 		return fmt.Errorf("Adding is possible only when the application started")
-
 	}
+	defer l.checkPanic() // при ошибке записи в журнал там возможна паника, её перехватывать
+	// подготовка данных для сохранения в лог
+	req := reqWriteList{Time: time.Now().Unix(), List: input}
+	toSaveLog, err := l.bodyOperation(req, codeWriteList)
+	if err != nil {
+		return err
+	}
+	// проверяем, достаточно ли ресурсов (памяти, диска) для выполнения задачи
+	if !l.resControl.GetPermission(int64(len(toSaveLog))) {
+		return fmt.Errorf("Insufficient resources (memory, disk)")
+	}
+
+	// size := 0
+	// for k, v := range input {
+	// 	size += len(k) + len(v)
+	// }
+	// if !l.resControl.GetPermission(int64(size)) {
+	// 	return fmt.Errorf("Insufficient resources (memory, disk)")
+	// }
+
+	// блокируем нужные записи
 	keys := l.getKeysFromArray(input)
 	l.porter.Catch(keys)
 	defer l.porter.Throw(keys)
-	defer l.checkPanic() // при ошибке записи в журнал там возможна паника, её перехватывать
 
 	// проводим операцию  с inmemory хранилищем
 	l.store.setRecords(input)
 
 	//WAL
-	req := reqWriteList{Time: time.Now().Unix(), List: input}
-	if err := l.writeOperation(req, codeWriteList); err != nil {
-		return err
-	}
+	// req := reqWriteList{Time: time.Now().Unix(), List: input}
+	// if err := l.writeOperation(req, codeWriteList); err != nil {
+	// 	return err
+	// }
+	l.journal.Write(toSaveLog)
 	return nil
 }
 
@@ -72,9 +101,21 @@ func (l *Larder) Transaction(handlerName string, keys []string, v interface{}) e
 	if atomic.LoadInt64(&l.hasp) != stateStarted {
 		return fmt.Errorf("Transaction is possible only when the application started")
 	}
+	defer l.checkPanic() // при ошибке записи в журнал там возможна паника, её перехватывать
+
+	// подготовка данных для сохранения в лог
+	req := reqTransaction{Time: time.Now().Unix(), HandlerName: handlerName, Keys: keys, Value: v}
+	toSaveLog, err := l.bodyOperation(req, codeTransaction)
+	if err != nil {
+		return err
+	}
+	// проверяем, достаточно ли ресурсов (памяти, диска) для выполнения задачи
+	if !l.resControl.GetPermission(int64(len(toSaveLog))) {
+		return fmt.Errorf("Insufficient resources (memory, disk)")
+	}
+	// блокируем нужные записи
 	l.porter.Catch(keys)
 	defer l.porter.Throw(keys)
-	defer l.checkPanic() // при ошибке записи в журнал там возможна паника, её перехватывать
 	hdl, err := l.handlers.get(handlerName)
 	if err != nil {
 		return err
@@ -88,10 +129,11 @@ func (l *Larder) Transaction(handlerName string, keys []string, v interface{}) e
 	//TODO: сохранение изменённых записей (полученных после выполнения транзакции)
 
 	// сохранение в лог ЗАПРОСА
-	req := reqTransaction{Time: time.Now().Unix(), HandlerName: handlerName, Keys: keys, Value: v}
-	if err := l.writeOperation(req, codeTransaction); err != nil {
-		return err
-	}
+	// req := reqTransaction{Time: time.Now().Unix(), HandlerName: handlerName, Keys: keys, Value: v}
+	// if err := l.writeOperation(req, codeTransaction); err != nil {
+	// 	return err
+	// }
+	l.journal.Write(toSaveLog)
 	return nil
 }
 
