@@ -16,6 +16,7 @@ import (
 
 	"github.com/claygod/larder/journal"
 	"github.com/claygod/larder/repo"
+	"github.com/claygod/larder/resources"
 )
 
 /*
@@ -38,12 +39,13 @@ Larder -
 записи или группы записей.
 */
 type Larder struct {
-	mtx      sync.Mutex
-	counter  *counter //TODO: надобность счётчика под большим вопросом
-	porter   Porter
-	handlers *handlers
-	store    *inMemoryStorage
-	journal  *journal.Journal
+	mtx        sync.Mutex
+	counter    *counter //TODO: надобность счётчика под большим вопросом
+	porter     Porter
+	handlers   *handlers
+	store      *inMemoryStorage
+	journal    *journal.Journal
+	resControl *resources.ResourcesControl
 	//chJournal chan []byte
 	chStop    chan struct{}
 	filePath  string
@@ -51,20 +53,30 @@ type Larder struct {
 	hasp      int64
 }
 
-func New(filePath string, porter Porter, batchSize int) *Larder {
-	//chInput := make(chan []byte, 100)
-	//j := journal.New(filePath, mockAlarmHandle, nil, batchSize)
+func New(filePath string, porter Porter, batchSize int) (*Larder, error) {
+	cnfResCtrl := &resources.Config{
+		LimitMemory:    100 * megabyte,
+		AddRatioMemory: 5000,
+		LimitDisk:      100 * megabyte,
+		AddRatioDisk:   5000,
+	}
+	resCtrl, err := resources.New(cnfResCtrl)
+	if err != nil {
+		return nil, err
+	}
+
 	return &Larder{
 		counter:  newCounter(), //TODO значение счётчика надо устанавливать исходя из процесса загрузки
 		porter:   porter,
 		handlers: newHandlers(),
 		store:    newStorage(repo.New()),
 		//journal:  j,
+		resControl: resCtrl,
 		//chJournal: chInput,
 		filePath:  filePath,
 		batchSize: batchSize,
 		//TODO: log: Logger
-	}
+	}, nil
 }
 
 func (l *Larder) Start() {
