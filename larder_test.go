@@ -78,7 +78,11 @@ func BenchmarkNewLarderParallel1(b *testing.B) {
 	forTestClearDir("./log/")
 	dummy := forTestGetDummy(100) //make([]byte, 1000)
 	p := porter.New()
-	lr := New("./log/", p, 2000)
+	lr, err := New("./log/", p, 2000)
+	if err != nil {
+		b.Error(err)
+		return
+	}
 	lr.Start()
 	defer lr.Stop()
 	u := 0
@@ -98,7 +102,11 @@ func BenchmarkNewLarderParallelPprof(b *testing.B) {
 	forTestClearDir("./log/")
 	dummy := forTestGetDummy(100) //make([]byte, 1000)
 	p := porter.New()
-	lr := New("./log/", p, 2000)
+	lr, err := New("./log/", p, 2000)
+	if err != nil {
+		b.Error(err)
+		return
+	}
 	lr.Start()
 	defer lr.Stop()
 	u := 0
@@ -128,7 +136,11 @@ func BenchmarkNewLarderSequence(b *testing.B) {
 	dummy := forTestGetDummy(100) //make([]byte, 1000)
 
 	p := porter.New()
-	lr := New("./log/", p, 2000)
+	lr, err := New("./log/", p, 2000)
+	if err != nil {
+		b.Error(err)
+		return
+	}
 	lr.Start()
 	defer lr.Stop()
 	b.SetParallelism(1)
