@@ -274,3 +274,30 @@ func (l *Larder) writeOperation(req interface{}, code byte) error {
 	l.journal.Write(toSaveLog)
 	return nil
 }
+
+func (l *Larder) writeOperationToLog(req interface{}, code byte) error {
+	var reqBuf bytes.Buffer
+	enc := gob.NewEncoder(&reqBuf)
+	if err := enc.Encode(req); err != nil {
+		return err
+	}
+	toSaveLog, err := l.prepareOperatToLog(code, reqBuf.Bytes())
+	if err != nil {
+		return err
+	}
+	l.journal.Write(toSaveLog)
+	return nil
+}
+
+func (l *Larder) bodyOperation(req interface{}, code byte) ([]byte, error) {
+	var reqBuf bytes.Buffer
+	enc := gob.NewEncoder(&reqBuf)
+	if err := enc.Encode(req); err != nil {
+		return nil, err
+	}
+	toSaveLog, err := l.prepareOperatToLog(code, reqBuf.Bytes())
+	if err != nil {
+		return nil, err
+	}
+	return toSaveLog, nil
+}
