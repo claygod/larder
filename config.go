@@ -11,8 +11,9 @@ const (
 )
 
 const (
-	maxKeyLength   int = int(uint64(1)<<16) - 1
-	maxValueLength int = int(uint64(1)<<48) - 1
+	maxKeyLength   int   = int(uint64(1)<<16) - 1
+	maxValueLength int   = int(uint64(1)<<48) - 1
+	megabyte       int64 = 1024 * 1024
 )
 
 const (
