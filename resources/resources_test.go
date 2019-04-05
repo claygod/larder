@@ -5,13 +5,10 @@ package resources
 // Copyright © 2019 Eduard Sesigin. All rights reserved. Contacts: <claygod@yandex.ru>
 
 import (
-	//"fmt"
 	"os"
 	"runtime"
 	"strconv"
 	"testing"
-	// "github.com/shirou/gopsutil/disk"
-	// "github.com/shirou/gopsutil/mem"
 )
 
 const overReq int64 = 1000000000000000000
@@ -40,28 +37,33 @@ func TestGenBadPath(t *testing.T) {
 
 func TestGetPermissionWithoutDiskLimit100(t *testing.T) {
 	cnf := &Config{
-		LimitMemory:    100,
-		AddRatioMemory: 5,
-		DickPath:       "",
+		LimitMemory: 100,
+		LimitDisk:   100,
+		DickPath:    "",
+	}
+	if runtime.GOOS == "windows" {
+		cnf.DickPath = "c:\\"
+	} else {
+		cnf.DickPath = "/"
 	}
 
-	m, err := New(cnf)
+	r, err := New(cnf)
 	if err != nil {
 		t.Error(err)
 	}
-	if !m.GetPermission(1) {
+	if !r.GetPermission(1) {
 		t.Error("Could not get permission with minimum requirements")
 	}
-	if m.GetPermission(overReq) {
+	if r.GetPermission(overReq) {
 		t.Error("Permission received for too large requirements")
 	}
 }
 
 func TestGetPermissionWithoutDiskLimit10000000000(t *testing.T) {
 	cnf := &Config{
-		LimitMemory:    1000000000000,
-		AddRatioMemory: 5,
-		DickPath:       "",
+		LimitMemory: 100,
+		LimitDisk:   1000000000000,
+		DickPath:    "",
 	}
 	_, err := New(cnf)
 	if err == nil {
@@ -69,51 +71,48 @@ func TestGetPermissionWithoutDiskLimit10000000000(t *testing.T) {
 	}
 }
 
-func TestGetPermissionWithoutDiskRatio10000000000(t *testing.T) {
+func TestGetPermissionWithoutMemoryLimit10000000000(t *testing.T) {
 	cnf := &Config{
-		LimitMemory:    100,
-		AddRatioMemory: 1000000000000,
-		DickPath:       "",
+		LimitMemory: 1000000000000,
+		LimitDisk:   100,
+		DickPath:    "",
 	}
-	m, err := New(cnf)
-	if err != nil {
-		t.Error(err)
-	}
-	if m.GetPermission(1) {
-		t.Error("Permission received for too large ratio")
+	_, err := New(cnf)
+	if err == nil {
+		t.Error("Permission received for too large limit")
 	}
 }
 
 func TestGetPermissionWithDisk(t *testing.T) {
 	cnf := &Config{
-		LimitMemory:    100,
-		AddRatioMemory: 5,
-		LimitDisk:      100,
-		AddRatioDisk:   5,
+		LimitMemory: 100,
+		//AddRatioMemory: 5,
+		LimitDisk: 100,
+		//AddRatioDisk:   5,
 	}
 	if runtime.GOOS == "windows" {
 		cnf.DickPath = "c:\\"
 	} else {
 		cnf.DickPath = "/"
 	}
-	m, err := New(cnf)
+	r, err := New(cnf)
 	if err != nil {
 		t.Error(err)
 	}
-	if !m.GetPermission(1) {
+	if !r.GetPermission(1) {
 		t.Error("Could not get permission with minimum requirements")
 	}
-	if m.GetPermission(overReq) {
+	if r.GetPermission(overReq) {
 		t.Error("Permission received for too large requirements")
 	}
 }
 
 func TestGetPermissionWithDiskBadPath(t *testing.T) {
 	cnf := &Config{
-		LimitMemory:    100,
-		AddRatioMemory: 5,
-		LimitDisk:      100,
-		AddRatioDisk:   5,
+		LimitMemory: 100,
+		//AddRatioMemory: 5,
+		LimitDisk: 100,
+		//AddRatioDisk:   5,
 	}
 	if runtime.GOOS == "windows" {
 		cnf.DickPath = badPathWin
@@ -123,5 +122,51 @@ func TestGetPermissionWithDiskBadPath(t *testing.T) {
 	_, err := New(cnf)
 	if err == nil {
 		t.Errorf("Wrong path %s should have caused an error", cnf.DickPath)
+	}
+}
+
+func BenchmarkSetFreeMemory(b *testing.B) { // go tool pprof -web ./batcher.test ./cpu.txt
+	b.StopTimer()
+	cnf := &Config{
+		LimitMemory: 100,
+		//AddRatioMemory: 5,
+		LimitDisk: 100,
+		//AddRatioDisk:   5,
+	}
+	if runtime.GOOS == "windows" {
+		cnf.DickPath = "c:\\"
+	} else {
+		cnf.DickPath = "/"
+	}
+	r, err := New(cnf)
+	if err != nil {
+		b.Error(err)
+	}
+	b.StartTimer()
+	for i := 0; i < b.N; i++ {
+		r.setFreeMemory()
+	}
+}
+
+func BenchmarkSetFreeDisk(b *testing.B) { // go tool pprof -web ./batcher.test ./cpu.txt
+	b.StopTimer()
+	cnf := &Config{
+		LimitMemory: 100,
+		//AddRatioMemory: 5,
+		LimitDisk: 100,
+		//AddRatioDisk:   5,
+	}
+	if runtime.GOOS == "windows" {
+		cnf.DickPath = "c:\\"
+	} else {
+		cnf.DickPath = "/"
+	}
+	r, err := New(cnf)
+	if err != nil {
+		b.Error(err)
+	}
+	b.StartTimer()
+	for i := 0; i < b.N; i++ {
+		r.setFreeDisk()
 	}
 }

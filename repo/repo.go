@@ -45,12 +45,16 @@ func (r *RecordsRepo) SetOne(key string, value []byte) {
 
 func (r *RecordsRepo) Del(keys []string) error {
 	var errOut error
-	for _, key := range keys {
-		if _, ok := r.data[key]; ok {
-			delete(r.data, key)
-		} else {
+	for _, key := range keys { // сначала проверяем, есть ли все эти ключи
+		if _, ok := r.data[key]; !ok {
 			errOut = fmt.Errorf("%v %v", errOut, fmt.Errorf("Key `%s` not found", key))
 		}
+	}
+	if errOut != nil {
+		return errOut
+	}
+	for _, key := range keys { // теперь удаляем
+		delete(r.data, key)
 	}
 	return errOut
 }

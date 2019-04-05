@@ -17,8 +17,7 @@ const (
 )
 
 const (
-	codeWrite byte = iota
-	codeWriteList
+	codeWriteList byte = iota //codeWrite
 	codeTransaction
 	codeDeleteList
 )

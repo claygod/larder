@@ -120,19 +120,17 @@ func (l *Larder) Transaction(handlerName string, keys []string, v interface{}) e
 	if err != nil {
 		return err
 	}
-	// проводим операцию  с inmemory хранилищем
-	_, err = l.store.transaction(keys, v, hdl) //TODO: тут нужно возвращать map[key]value с новыми значениями
+	// читаем текущие значения
+	curValues, err := l.store.getRecords(keys)
 	if err != nil {
 		return err
 	}
-	//WAL
-	//TODO: сохранение изменённых записей (полученных после выполнения транзакции)
-
-	// сохранение в лог ЗАПРОСА
-	// req := reqTransaction{Time: time.Now().Unix(), HandlerName: handlerName, Keys: keys, Value: v}
-	// if err := l.writeOperation(req, codeTransaction); err != nil {
-	// 	return err
-	// }
+	// проводим операцию  с inmemory хранилищем
+	_, err = l.store.transaction(v, curValues, hdl) //TODO: тут нужно возвращать map[string][]byte с новыми значениями
+	if err != nil {
+		return err
+	}
+	//WAL сохранение изменённых записей (полученных после выполнения транзакции)
 	l.journal.Write(toSaveLog)
 	return nil
 }

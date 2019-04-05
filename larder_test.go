@@ -11,12 +11,14 @@ import (
 
 	//"path/filepath"
 	//"runtime/pprof"
+	"runtime"
 	"strconv"
 	"strings"
 	"testing"
 
 	//"time"
 
+	"github.com/claygod/larder/resources"
 	"github.com/claygod/tools/porter"
 )
 
@@ -78,7 +80,13 @@ func BenchmarkNewLarderParallel1(b *testing.B) {
 	forTestClearDir("./log/")
 	dummy := forTestGetDummy(100) //make([]byte, 1000)
 	p := porter.New()
-	lr, err := New("./log/", p, 2000)
+	resCntrl, err := forTestGetResouceControl()
+	if err != nil {
+		b.Error(err)
+		return
+	}
+
+	lr, err := New("./log/", p, resCntrl, 2000)
 	if err != nil {
 		b.Error(err)
 		return
@@ -96,39 +104,45 @@ func BenchmarkNewLarderParallel1(b *testing.B) {
 	})
 }
 
-// go tool pprof -web ./larder.test ./cpu.txt
-func BenchmarkNewLarderParallelPprof(b *testing.B) {
-	b.StopTimer()
-	forTestClearDir("./log/")
-	dummy := forTestGetDummy(100) //make([]byte, 1000)
-	p := porter.New()
-	lr, err := New("./log/", p, 2000)
-	if err != nil {
-		b.Error(err)
-		return
-	}
-	lr.Start()
-	defer lr.Stop()
-	u := 0
-	// f, err := os.Create("cpu.txt")
-	// if err != nil {
-	// 	log.Fatal("could not create CPU profile: ", err)
-	// }
-	// if err := pprof.StartCPUProfile(f); err != nil {
-	// 	log.Fatal("could not start CPU profile: ", err)
-	// }
-	//defer pprof.StopCPUProfile()
-	b.SetParallelism(256)
-	b.StartTimer()
+// // go tool pprof -web ./larder.test ./cpu.txt
+// func BenchmarkNewLarderParallelPprof(b *testing.B) {
+// 	b.StopTimer()
+// 	forTestClearDir("./log/")
+// 	dummy := forTestGetDummy(100) //make([]byte, 1000)
+// 	p := porter.New()
+// 	resCntrl, err := forTestGetResouceControl()
+// 	if err != nil {
+// 		b.Error(err)
+// 		return
+// 	}
 
-	b.RunParallel(func(pb *testing.PB) {
-		for pb.Next() {
-			lr.Write(strconv.Itoa(u), dummy)
-			u++
-		}
-	})
-	//time.Sleep(300 * time.Millisecond)
-}
+// 	lr, err := New("./log/", p, resCntrl, 2000)
+// 	if err != nil {
+// 		b.Error(err)
+// 		return
+// 	}
+// 	lr.Start()
+// 	defer lr.Stop()
+// 	u := 0
+// 	// f, err := os.Create("cpu.txt")
+// 	// if err != nil {
+// 	// 	log.Fatal("could not create CPU profile: ", err)
+// 	// }
+// 	// if err := pprof.StartCPUProfile(f); err != nil {
+// 	// 	log.Fatal("could not start CPU profile: ", err)
+// 	// }
+// 	//defer pprof.StopCPUProfile()
+// 	b.SetParallelism(256)
+// 	b.StartTimer()
+
+// 	b.RunParallel(func(pb *testing.PB) {
+// 		for pb.Next() {
+// 			lr.Write(strconv.Itoa(u), dummy)
+// 			u++
+// 		}
+// 	})
+// 	//time.Sleep(300 * time.Millisecond)
+// }
 
 func BenchmarkNewLarderSequence(b *testing.B) {
 	b.StopTimer()
@@ -136,7 +150,13 @@ func BenchmarkNewLarderSequence(b *testing.B) {
 	dummy := forTestGetDummy(100) //make([]byte, 1000)
 
 	p := porter.New()
-	lr, err := New("./log/", p, 2000)
+	resCntrl, err := forTestGetResouceControl()
+	if err != nil {
+		b.Error(err)
+		return
+	}
+
+	lr, err := New("./log/", p, resCntrl, 2000)
 	if err != nil {
 		b.Error(err)
 		return
@@ -182,4 +202,22 @@ func forTestGetDummy(count int) []byte {
 		dummy[i] = 105
 	}
 	return dummy
+}
+
+func forTestGetResouceControl() (Resourcer, error) {
+	cnf := &resources.Config{
+		LimitMemory: 100 * megabyte,
+		LimitDisk:   100 * megabyte,
+	}
+
+	if runtime.GOOS == "windows" {
+		cnf.DickPath = "c:\\"
+	} else {
+		cnf.DickPath = "/"
+	}
+	return resources.New(cnf)
+	//resCtrl, err := resources.New(cnfResCtrl)
+	// if err != nil {
+	// 	return nil, err
+	// }
 }

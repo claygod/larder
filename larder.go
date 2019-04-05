@@ -16,7 +16,7 @@ import (
 
 	"github.com/claygod/larder/journal"
 	"github.com/claygod/larder/repo"
-	"github.com/claygod/larder/resources"
+	//"github.com/claygod/larder/resources"
 )
 
 /*
@@ -45,7 +45,7 @@ type Larder struct {
 	handlers   *handlers
 	store      *inMemoryStorage
 	journal    *journal.Journal
-	resControl *resources.ResourcesControl
+	resControl Resourcer
 	//chJournal chan []byte
 	chStop    chan struct{}
 	filePath  string
@@ -53,17 +53,15 @@ type Larder struct {
 	hasp      int64
 }
 
-func New(filePath string, porter Porter, batchSize int) (*Larder, error) {
-	cnfResCtrl := &resources.Config{
-		LimitMemory:    100 * megabyte,
-		AddRatioMemory: 5000,
-		LimitDisk:      100 * megabyte,
-		AddRatioDisk:   5000,
-	}
-	resCtrl, err := resources.New(cnfResCtrl)
-	if err != nil {
-		return nil, err
-	}
+func New(filePath string, porter Porter, resCtrl Resourcer, batchSize int) (*Larder, error) {
+	// cnfResCtrl := &resources.Config{
+	// 	LimitMemory: 100 * megabyte,
+	// 	LimitDisk:   100 * megabyte,
+	// }
+	// resCtrl, err := resources.New(cnfResCtrl)
+	// if err != nil {
+	// 	return nil, err
+	// }
 
 	return &Larder{
 		counter:  newCounter(), //TODO значение счётчика надо устанавливать исходя из процесса загрузки
@@ -90,13 +88,14 @@ func (l *Larder) Start() {
 func (l *Larder) Stop() {
 	if atomic.CompareAndSwapInt64(&l.hasp, stateStarted, stateStopped) { //TODO:
 		l.journal.Close()
+		//TODO: сохранение в
 	}
 }
 
 /*
 SetHandler - add handler. This can be done both before launch and during database operation.
 */
-func (l *Larder) SetHandler(handlerName string, handlerMethod func([]string, Repo, interface{}) ([]byte, error)) error {
+func (l *Larder) SetHandler(handlerName string, handlerMethod func(interface{}, map[string][]byte) (map[string][]byte, error)) error {
 	//	if atomic.LoadInt64(&l.hasp) == stateStarted {
 	//		return fmt.Errorf("Handles cannot be added while the application is running.")
 	//	}

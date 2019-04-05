@@ -49,8 +49,8 @@ func (s *inMemoryStorage) setUnsafeRecord(key string, value []byte) {
 	s.repo.SetOne(key, value)
 }
 
-func (s *inMemoryStorage) transaction(keys []string, v interface{}, f func([]string, Repo, interface{}) ([]byte, error)) ([]byte, error) {
+func (s *inMemoryStorage) transaction(v interface{}, curValues map[string][]byte, f func(interface{}, map[string][]byte) (map[string][]byte, error)) (map[string][]byte, error) {
 	s.mtx.RLock()
 	defer s.mtx.RUnlock()
-	return f(keys, s.repo, v)
+	return f(v, curValues)
 }

@@ -9,113 +9,124 @@ import (
 	"os"
 	"runtime"
 	"sync/atomic"
+	"time"
 
 	"github.com/shirou/gopsutil/disk"
 	"github.com/shirou/gopsutil/mem"
 )
 
 /*
-Memory - indicator of the status of the physical memory (and disk) of the device.
+ResourcesControl - indicator of the status of the physical memory (and disk) of the device.
 if DiskPath == "" in config, then free disk space we do not control.
 */
-type Memory struct {
+type ResourcesControl struct {
 	config     *Config
 	freeMemory int64
 	freeDisk   int64
+	counter    int64
 }
 
-func New(cnf *Config) (*Memory, error) {
-	m := &Memory{
-		config:     cnf,
-		freeMemory: 0,
-	}
-	// if runtime.GOOS == "windows" {
-	// }
-	if err := m.setFreeMemory(); err != nil {
-		return nil, err
-	} else if m.freeMemory < m.config.LimitMemory*2 {
-		return nil, fmt.Errorf("Low available memory: %d bytes", m.freeMemory)
-	}
-
-	// check DiskPath
+func New(cnf *Config) (*ResourcesControl, error) {
+	m := &ResourcesControl{config: cnf}
 	if m.config.DickPath != "" {
 		if stat, err := os.Stat(m.config.DickPath); err != nil || !stat.IsDir() {
 			return nil, fmt.Errorf("Invalid disk path: %s ", m.config.DickPath)
 		}
 	}
-	if err := m.setFreeDisk(); err != nil {
+	if err := m.setFreeResources(); err != nil {
 		return nil, err
-	} else if m.freeDisk < m.config.LimitDisk*2 {
+	}
+	if m.freeDisk < m.config.LimitDisk*2 {
 		return nil, fmt.Errorf("Low available disk: %d bytes", m.freeDisk)
 	}
+	if m.freeMemory < m.config.LimitMemory*2 {
+		return nil, fmt.Errorf("Low available memory: %d bytes", m.freeMemory)
+	}
+	go m.freeResourceSetter()
 	return m, nil
 }
 
 /*
 GetPermission - get permission to use memory (and disk).
 */
-func (m *Memory) GetPermission(size int64) bool {
-	if m.getPermissionMemory(size) {
-		if m.getPermissionDisk(size) {
-			return true
-		}
-		m.setFreeMemory() // reset free-size
-		return false
+func (r *ResourcesControl) GetPermission(size int64) bool {
+	counterNew := atomic.AddInt64(&r.counter, 1)
+	if int8(counterNew) == 0 {
+		r.setFreeResources()
 	}
-	m.setFreeMemory()
-	return m.getPermissionMemory(size)
+	if r.getPermissionMemory(size) && r.getPermissionDisk(size) {
+		return true
+	}
+	return false
 }
 
-func (m *Memory) setFreeDisk() error {
-	if m.config.DickPath == "" {
+func (r *ResourcesControl) setFreeResources() error {
+	if err := r.setFreeDisk(); err != nil {
+		return err
+	}
+	if err := r.setFreeMemory(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (r *ResourcesControl) setFreeDisk() error {
+	if r.config.DickPath == "" {
 		return nil
 	}
-	us, err := disk.Usage(m.config.DickPath)
+	us, err := disk.Usage(r.config.DickPath)
 	if err != nil {
-		atomic.StoreInt64(&m.freeDisk, 0)
+		atomic.StoreInt64(&r.freeDisk, 0)
 		return err
 	} else {
-		atomic.StoreInt64(&m.freeDisk, int64(us.Free))
+		atomic.StoreInt64(&r.freeDisk, int64(us.Free))
 		return nil
 	}
 }
 
-func (m *Memory) setFreeMemory() error {
+func (r *ResourcesControl) setFreeMemory() error {
 	vms, err := mem.VirtualMemory()
 	if err != nil {
-		atomic.StoreInt64(&m.freeMemory, 0)
+		atomic.StoreInt64(&r.freeMemory, 0)
 		return err
 	} else {
-		atomic.StoreInt64(&m.freeMemory, int64(vms.Available))
+		atomic.StoreInt64(&r.freeMemory, int64(vms.Available))
 		return nil
 	}
 }
 
-func (m *Memory) getPermissionDisk(size int64) bool {
-	if m.config.DickPath == "" {
+func (r *ResourcesControl) getPermissionDisk(size int64) bool {
+	if r.config.DickPath == "" {
 		return true
 	}
 	for {
-		curFree := atomic.LoadInt64(&m.freeDisk)
-		if curFree-size-m.config.AddRatioDisk > m.config.LimitDisk &&
-			atomic.CompareAndSwapInt64(&m.freeDisk, curFree, curFree-size-m.config.AddRatioDisk) {
+		curFree := atomic.LoadInt64(&r.freeDisk)
+		if curFree-size > r.config.LimitDisk &&
+			atomic.CompareAndSwapInt64(&r.freeDisk, curFree, curFree-size) {
 			return true
-		} else if curFree-size-m.config.AddRatioDisk <= m.config.LimitDisk {
+		} else if curFree-size <= r.config.LimitDisk {
 			return false
 		}
 		runtime.Gosched()
 	}
 }
 
-func (m *Memory) getPermissionMemory(size int64) bool {
+func (r *ResourcesControl) getPermissionMemory(size int64) bool {
 	for {
-		curFree := atomic.LoadInt64(&m.freeMemory)
-		if curFree-size-m.config.AddRatioMemory > m.config.LimitMemory &&
-			atomic.CompareAndSwapInt64(&m.freeMemory, curFree, curFree-size-m.config.AddRatioMemory) {
+		curFree := atomic.LoadInt64(&r.freeMemory)
+		if curFree-size > r.config.LimitMemory &&
+			atomic.CompareAndSwapInt64(&r.freeMemory, curFree, curFree-size) {
 			return true
-		} else if curFree-size-m.config.AddRatioMemory <= m.config.LimitMemory {
+		} else if curFree-size <= r.config.LimitMemory {
 			return false
 		}
 		runtime.Gosched()
+	}
+}
+
+func (r *ResourcesControl) freeResourceSetter() {
+	ticker := time.NewTicker(timeRefresh)
+	for range ticker.C {
+		r.setFreeResources()
 	}
 }
