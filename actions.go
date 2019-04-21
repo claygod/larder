@@ -116,7 +116,7 @@ func (l *Larder) Transaction(handlerName string, keys []string, v interface{}) e
 	// блокируем нужные записи
 	l.porter.Catch(keys)
 	defer l.porter.Throw(keys)
-	hdl, err := l.handlers.get(handlerName)
+	hdl, err := l.handlers.Get(handlerName)
 	if err != nil {
 		return err
 	}

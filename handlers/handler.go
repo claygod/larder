@@ -1,7 +1,7 @@
-package larder
+package handlers
 
-// Larder
 // Handlers
+// Handlers repo
 // Copyright © 2018 Eduard Sesigin. All rights reserved. Contacts: <claygod@yandex.ru>
 
 import (
@@ -12,18 +12,18 @@ import (
 /*
 handlers - parallel storage
 */
-type handlers struct {
+type Handlers struct {
 	mtx      sync.RWMutex
 	handlers map[string]func(interface{}, map[string][]byte) (map[string][]byte, error)
 }
 
-func newHandlers() *handlers {
-	return &handlers{
+func New() *Handlers {
+	return &Handlers{
 		handlers: make(map[string]func(interface{}, map[string][]byte) (map[string][]byte, error)),
 	}
 }
 
-func (h *handlers) get(handlerName string) (func(interface{}, map[string][]byte) (map[string][]byte, error), error) {
+func (h *Handlers) Get(handlerName string) (func(interface{}, map[string][]byte) (map[string][]byte, error), error) {
 	h.mtx.RLock()
 	hdl, ok := h.handlers[handlerName]
 	h.mtx.RUnlock()
@@ -33,7 +33,7 @@ func (h *handlers) get(handlerName string) (func(interface{}, map[string][]byte)
 	return hdl, nil
 }
 
-func (h *handlers) set(handlerName string, handlerMethod func(interface{}, map[string][]byte) (map[string][]byte, error)) error {
+func (h *Handlers) Set(handlerName string, handlerMethod func(interface{}, map[string][]byte) (map[string][]byte, error)) error {
 	h.mtx.Lock()
 	defer h.mtx.Unlock()
 	_, ok := h.handlers[handlerName]

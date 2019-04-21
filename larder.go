@@ -14,6 +14,7 @@ import (
 
 	_ "net/http/pprof"
 
+	"github.com/claygod/larder/handlers"
 	"github.com/claygod/larder/journal"
 	"github.com/claygod/larder/repo"
 	//"github.com/claygod/larder/resources"
@@ -41,7 +42,7 @@ Larder -
 type Larder struct {
 	mtx        sync.Mutex
 	porter     Porter
-	handlers   *handlers
+	handlers   *handlers.Handlers
 	store      *inMemoryStorage
 	journal    *journal.Journal
 	resControl Resourcer
@@ -64,7 +65,7 @@ func New(filePath string, porter Porter, resCtrl Resourcer, batchSize int) (*Lar
 
 	return &Larder{
 		porter:   porter,
-		handlers: newHandlers(),
+		handlers: handlers.New(),
 		store:    newStorage(repo.New()),
 		//journal:  j,
 		resControl: resCtrl,
@@ -96,5 +97,5 @@ func (l *Larder) SetHandler(handlerName string, handlerMethod func(interface{}, 
 	//	if atomic.LoadInt64(&l.hasp) == stateStarted {
 	//		return fmt.Errorf("Handles cannot be added while the application is running.")
 	//	}
-	return l.handlers.set(handlerName, handlerMethod)
+	return l.handlers.Set(handlerName, handlerMethod)
 }
