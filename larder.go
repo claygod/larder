@@ -40,7 +40,6 @@ Larder -
 */
 type Larder struct {
 	mtx        sync.Mutex
-	counter    *counter //TODO: надобность счётчика под большим вопросом
 	porter     Porter
 	handlers   *handlers
 	store      *inMemoryStorage
@@ -64,7 +63,6 @@ func New(filePath string, porter Porter, resCtrl Resourcer, batchSize int) (*Lar
 	// }
 
 	return &Larder{
-		counter:  newCounter(), //TODO значение счётчика надо устанавливать исходя из процесса загрузки
 		porter:   porter,
 		handlers: newHandlers(),
 		store:    newStorage(repo.New()),
@@ -79,7 +77,6 @@ func New(filePath string, porter Porter, resCtrl Resourcer, batchSize int) (*Lar
 
 func (l *Larder) Start() {
 	if atomic.CompareAndSwapInt64(&l.hasp, stateStopped, stateStarted) { //TODO:
-		//chInput := make(chan []byte, 100)
 		l.journal = journal.New(l.filePath, mockAlarmHandle, nil, l.batchSize)
 		//l.journal.Start()
 	}
