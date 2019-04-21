@@ -22,12 +22,6 @@ func (l *Larder) getKeysFromArray(arr map[string][]byte) []string {
 	return keys
 }
 
-// func (l *Larder) copyKeys(keys []string) []string {
-// 	keys2 := make([]string, 0, len(keys))
-// 	copy(keys2, keys)
-// 	return keys2
-// }
-
 func (l *Larder) getHeader(keys []string) []string {
 	keys2 := make([]string, 0, len(keys))
 	copy(keys2, keys)
@@ -37,85 +31,6 @@ func (l *Larder) getHeader(keys []string) []string {
 func mockAlarmHandle(err error) { //TODO: возможно, тут будет передаваться логгер
 	panic(err)
 }
-
-// /*
-// prepareOperationToLog - operationCode, operationSize(keySize and valueSize), operationBody
-// */
-// func (l *Larder) prepareOperationToLog(codeOperation byte, key string, value []byte) ([]byte, error) {
-// 	var buf bytes.Buffer
-// 	if len(key) > maxKeyLength {
-// 		return nil, fmt.Errorf("Key length %d is greater than permissible %d", len(key), maxKeyLength)
-// 	}
-// 	if len(value) > maxValueLength {
-// 		return nil, fmt.Errorf("Value length %d is greater than permissible %d", len(value), maxValueLength)
-// 	}
-
-// 	// code
-// 	if err := buf.WriteByte(codeOperation); err != nil {
-// 		return nil, err
-// 	}
-// 	// total size
-// 	//	b1 := make([]byte, 8)
-// 	//	binary.LittleEndian.PutUint64(b1, uint64(len([]byte(key))+len(value))) //i = int64(binary.LittleEndian.Uint64(b))
-// 	//	if _, err := buf.Write(b1); err != nil {
-// 	//		return nil, err
-// 	//	}
-// 	// operation size
-// 	var size uint64 = uint64(len([]byte(value)))
-// 	size = size << 16
-// 	size += uint64(len(key))
-// 	//	b2 := make([]byte, 8)
-// 	//	binary.LittleEndian.PutUint64(b2, uint64(size))
-// 	if _, err := buf.Write(uint64ToBytes(size)); err != nil {
-// 		return nil, err
-// 	}
-// 	// operation body
-// 	if _, err := buf.Write([]byte(key)); err != nil {
-// 		return nil, err
-// 	}
-// 	if _, err := buf.Write(value); err != nil {
-// 		return nil, err
-// 	}
-
-// 	return buf.Bytes(), nil
-// }
-
-// /*
-// prepareRecordToCheckpoint -
-// */
-// func (l *Larder) prepareRecordToCheckpoint(key string, value []byte) ([]byte, error) {
-// 	if len(key) > maxKeyLength {
-// 		return nil, fmt.Errorf("Key length %d is greater than permissible %d", len(key), maxKeyLength)
-// 	}
-// 	if len(value) > maxValueLength {
-// 		return nil, fmt.Errorf("Value length %d is greater than permissible %d", len(value), maxValueLength)
-// 	}
-
-// 	var size uint64 = uint64(len([]byte(value)))
-// 	size = size << 16
-// 	size += uint64(len(key))
-
-// 	return append(uint64ToBytes(size), (append([]byte(key), value...))...), nil
-
-// 	//	rw := reqWrite{
-// 	//		Key:   key,
-// 	//		Value: value,
-// 	//	}
-// 	//	var bufBody bytes.Buffer
-// 	//	ge := gob.NewEncoder(&bufBody)
-// 	//	if err := ge.Encode(rw); err != nil {
-// 	//		return nil, err
-// 	//	}
-
-// 	//	var buf bytes.Buffer
-// 	//	if _, err := buf.Write(uint64ToBytes(uint64(bufBody.Len()))); err != nil {
-// 	//		return nil, err
-// 	//	}
-// 	//	if _, err := buf.Write(bufBody.Bytes()); err != nil {
-// 	//		return nil, err
-// 	//	}
-// 	//	return buf.Bytes(), nil
-// }
 
 func (l *Larder) loadRecordsFromCheckpoint(f *os.File) error {
 	rSize := make([]byte, 8)
