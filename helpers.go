@@ -164,57 +164,6 @@ func (l *Larder) loadRecordsFromCheckpoint(f *os.File) error {
 	return nil
 }
 
-/*
-prepareRecordToLog -
-*/
-func (l *Larder) prepareRecordToLog(key string, value []byte) ([]byte, error) {
-	rw := reqWrite{
-		Key:   key,
-		Value: value,
-	}
-	var bufBody bytes.Buffer
-	ge := gob.NewEncoder(&bufBody)
-	if err := ge.Encode(rw); err != nil {
-		return nil, err
-	}
-
-	var buf bytes.Buffer
-	if _, err := buf.Write(uint64ToBytes(uint64(bufBody.Len()))); err != nil {
-		return nil, err
-	}
-	if _, err := buf.Write(bufBody.Bytes()); err != nil {
-		return nil, err
-	}
-	return buf.Bytes(), nil
-}
-
-// /*
-// prepareWriteToLog -
-// */
-// func (l *Larder) prepareWriteToLog(code byte, key string, value []byte) ([]byte, error) {
-// 	rw := reqWrite{
-// 		Key:   key,
-// 		Value: value,
-// 	}
-// 	var bufBody bytes.Buffer
-// 	ge := gob.NewEncoder(&bufBody)
-// 	if err := ge.Encode(rw); err != nil {
-// 		return nil, err
-// 	}
-
-// 	var buf bytes.Buffer
-// 	if _, err := buf.Write(uint64ToBytes(uint64(bufBody.Len() + 1))); err != nil {
-// 		return nil, err
-// 	}
-// 	if err := buf.WriteByte(code); err != nil {
-// 		return nil, err
-// 	}
-// 	if _, err := buf.Write(bufBody.Bytes()); err != nil {
-// 		return nil, err
-// 	}
-// 	return buf.Bytes(), nil
-// }
-
 func (l *Larder) prepareOperatToLog(code byte, value []byte) ([]byte, error) {
 	var buf bytes.Buffer
 	if _, err := buf.Write(uint64ToBytes(uint64(len(value) + 1))); err != nil {
@@ -262,20 +211,6 @@ func (l *Larder) checkPanic() {
 writeOperation - получаем сериализованный запрос и записываем его
 */
 func (l *Larder) writeOperation(req interface{}, code byte) error {
-	var reqBuf bytes.Buffer
-	enc := gob.NewEncoder(&reqBuf)
-	if err := enc.Encode(req); err != nil {
-		return err
-	}
-	toSaveLog, err := l.prepareOperatToLog(code, reqBuf.Bytes())
-	if err != nil {
-		return err
-	}
-	l.journal.Write(toSaveLog)
-	return nil
-}
-
-func (l *Larder) writeOperationToLog(req interface{}, code byte) error {
 	var reqBuf bytes.Buffer
 	enc := gob.NewEncoder(&reqBuf)
 	if err := enc.Encode(req); err != nil {
