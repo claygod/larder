@@ -79,9 +79,38 @@ func (l *Larder) loadRecordsFromCheckpoint(f *os.File) error {
 	return nil
 }
 
-func (l *Larder) prepareRecordToCheckpoint(key string, body []byte) ([]byte, error) { //
-	//TODO
-	return body, nil
+func (l *Larder) prepareRecordToCheckpoint(key string, value []byte) ([]byte, error) {
+	if len(key) > maxKeyLength {
+		return nil, fmt.Errorf("Key length %d is greater than permissible %d", len(key), maxKeyLength)
+	}
+	if len(value) > maxValueLength {
+		return nil, fmt.Errorf("Value length %d is greater than permissible %d", len(value), maxValueLength)
+	}
+
+	var size uint64 = uint64(len([]byte(value)))
+	size = size << 16
+	size += uint64(len(key))
+
+	return append(uint64ToBytes(size), (append([]byte(key), value...))...), nil
+
+	//	rw := reqWrite{
+	//		Key:   key,
+	//		Value: value,
+	//	}
+	//	var bufBody bytes.Buffer
+	//	ge := gob.NewEncoder(&bufBody)
+	//	if err := ge.Encode(rw); err != nil {
+	//		return nil, err
+	//	}
+
+	//	var buf bytes.Buffer
+	//	if _, err := buf.Write(uint64ToBytes(uint64(bufBody.Len()))); err != nil {
+	//		return nil, err
+	//	}
+	//	if _, err := buf.Write(bufBody.Bytes()); err != nil {
+	//		return nil, err
+	//	}
+	//	return buf.Bytes(), nil
 }
 
 func (l *Larder) prepareOperatToLog(code byte, value []byte) ([]byte, error) {
