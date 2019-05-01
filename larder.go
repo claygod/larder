@@ -47,6 +47,7 @@ type Larder struct {
 	porter     Porter
 	handlers   *handlers.Handlers
 	store      *inMemoryStorage
+	follow     *Follow
 	journal    *journal.Journal
 	resControl Resourcer
 	//chJournal chan []byte
@@ -57,6 +58,8 @@ type Larder struct {
 }
 
 func New(filePath string, porter Porter, resCtrl Resourcer, batchSize int) (*Larder, error) {
+	//TODO load DB and create follow (2*inMemoryStorage)
+
 	// cnfResCtrl := &resources.Config{
 	// 	LimitMemory: 100 * megabyte,
 	// 	LimitDisk:   100 * megabyte,
