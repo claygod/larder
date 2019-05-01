@@ -8,9 +8,12 @@ import (
 	//"bytes"
 	//"encoding/binary"
 	//"fmt"
-	//"time"
+	"os"
+	"runtime"
+	"strconv"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	_ "net/http/pprof"
 
@@ -76,17 +79,30 @@ func New(filePath string, porter Porter, resCtrl Resourcer, batchSize int) (*Lar
 	}, nil
 }
 
-func (l *Larder) Start() {
-	if atomic.CompareAndSwapInt64(&l.hasp, stateStopped, stateStarted) { //TODO:
-		l.journal = journal.New(l.filePath, mockAlarmHandle, nil, l.batchSize)
-		//l.journal.Start()
+func (l *Larder) Start() int64 { // return prev state
+	for {
+		if atomic.LoadInt64(&l.hasp) == stateStarted {
+			return stateStarted
+		} else if atomic.CompareAndSwapInt64(&l.hasp, stateStopped, stateStarted) {
+			l.journal = journal.New(l.filePath, mockAlarmHandle, nil, l.batchSize)
+			return stateStopped
+		}
+		runtime.Gosched()
+		time.Sleep(1 * time.Millisecond)
 	}
 }
 
-func (l *Larder) Stop() {
-	if atomic.CompareAndSwapInt64(&l.hasp, stateStarted, stateStopped) { //TODO:
-		l.journal.Close()
-		//TODO: сохранение в
+func (l *Larder) Stop() int64 { // return prev state
+	for {
+		if atomic.LoadInt64(&l.hasp) == stateStopped {
+			return stateStopped
+		} else if atomic.CompareAndSwapInt64(&l.hasp, stateStarted, stateStopped) {
+			l.journal.Close()
+			//TODO: сохранение в
+			return stateStarted
+		}
+		runtime.Gosched()
+		time.Sleep(1 * time.Millisecond)
 	}
 }
 
@@ -98,4 +114,52 @@ func (l *Larder) SetHandler(handlerName string, handlerMethod func(interface{}, 
 	//		return fmt.Errorf("Handles cannot be added while the application is running.")
 	//	}
 	return l.handlers.Set(handlerName, handlerMethod)
+}
+
+func (l *Larder) Save() error {
+	curState := l.Stop()
+	if curState == stateStarted {
+		defer l.Start()
+	}
+	chpName := getNewCheckPointName(l.filePath)
+	f, err := os.Create(chpName)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	chRecord := make(chan *repo.Record, 10) //TODO: size?
+	l.store.iterator(chRecord)
+	for rec := <-chRecord; ; {
+		switch {
+		case rec == nil:
+			break
+		default:
+			//TODO save rec to checkpoint
+			prb, err := l.prepareRecordToCheckpoint(rec.Key, rec.Body)
+			if err != nil {
+				defer os.Remove(chpName)
+				return err
+			}
+			if _, err := f.Write(prb); err != nil {
+				defer os.Remove(chpName)
+				return err
+			}
+		}
+	}
+	if err := os.Rename(chpName, chpName+"point"); err != nil {
+		defer os.Remove(chpName)
+		return err
+	}
+	return nil
+}
+
+func getNewCheckPointName(dirPath string) string {
+	for {
+		newFileName := dirPath + strconv.Itoa(int(time.Now().Unix())) + ".check"
+		if _, err := os.Stat(newFileName); !os.IsExist(err) {
+			return newFileName
+		}
+		time.Sleep(1 * time.Second)
+	}
 }

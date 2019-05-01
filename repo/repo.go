@@ -6,6 +6,7 @@ package repo
 
 import (
 	"fmt"
+	//"io"
 )
 
 /*
@@ -59,7 +60,7 @@ func (r *RecordsRepo) Del(keys []string) error {
 	return errOut
 }
 
-func (r *RecordsRepo) Keys() []string { // Resource-intensive m//ethod
+func (r *RecordsRepo) Keys() []string { // Resource-intensive method
 	out := make([]string, 0, len(r.data))
 	for key, _ := range r.data {
 		out = append(out, key)
@@ -69,4 +70,19 @@ func (r *RecordsRepo) Keys() []string { // Resource-intensive m//ethod
 
 func (r *RecordsRepo) Len() int {
 	return len(r.data)
+}
+
+func (r *RecordsRepo) Iterator(chRecord chan *Record, chFinish chan struct{}) {
+	for key, body := range r.data {
+		chRecord <- &Record{
+			Key:  key,
+			Body: body,
+		}
+	}
+	close(chFinish)
+}
+
+type Record struct {
+	Key  string
+	Body []byte
 }

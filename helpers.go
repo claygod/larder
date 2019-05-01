@@ -79,6 +79,11 @@ func (l *Larder) loadRecordsFromCheckpoint(f *os.File) error {
 	return nil
 }
 
+func (l *Larder) prepareRecordToCheckpoint(key string, body []byte) ([]byte, error) { //
+	//TODO
+	return body, nil
+}
+
 func (l *Larder) prepareOperatToLog(code byte, value []byte) ([]byte, error) {
 	var buf bytes.Buffer
 	if _, err := buf.Write(uint64ToBytes(uint64(len(value) + 1))); err != nil {

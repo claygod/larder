@@ -7,6 +7,8 @@ package larder
 import (
 	// "fmt"
 	"sync"
+
+	"github.com/claygod/larder/repo"
 )
 
 /*
@@ -18,10 +20,10 @@ inMemoryStorage - in-memory data storage.
 */
 type inMemoryStorage struct {
 	mtx  sync.RWMutex
-	repo Repo
+	repo *repo.RecordsRepo
 }
 
-func newStorage(r Repo) *inMemoryStorage {
+func newStorage(r *repo.RecordsRepo) *inMemoryStorage {
 	return &inMemoryStorage{
 		repo: r,
 	}
@@ -53,4 +55,12 @@ func (s *inMemoryStorage) transaction(v interface{}, curValues map[string][]byte
 	s.mtx.RLock()
 	defer s.mtx.RUnlock()
 	return f(v, curValues)
+}
+
+func (s *inMemoryStorage) iterator(chRecord chan *repo.Record) {
+	s.mtx.Lock()
+	defer s.mtx.Unlock()
+	chFinish := make(chan struct{})
+	s.repo.Iterator(chRecord, chFinish)
+	<-chFinish
 }
