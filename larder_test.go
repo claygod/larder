@@ -14,6 +14,7 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"testing"
 
 	//"time"
@@ -78,7 +79,7 @@ import (
 func BenchmarkNewLarderParallel1(b *testing.B) {
 	b.StopTimer()
 	forTestClearDir("./log/")
-	dummy := forTestGetDummy(100) //make([]byte, 1000)
+	dummy := forTestGetDummy(1) //make([]byte, 1000)
 	p := porter.New()
 	resCntrl, err := forTestGetResouceControl()
 	if err != nil {
@@ -93,13 +94,17 @@ func BenchmarkNewLarderParallel1(b *testing.B) {
 	}
 	lr.Start()
 	defer lr.Stop()
-	u := 0
-	b.SetParallelism(256)
+	var u int64
+	b.SetParallelism(64)
 	b.StartTimer()
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
-			lr.journal.Write(dummy)
-			u++
+			sh := atomic.AddInt64(&u, 1)
+			if err := lr.Write(strconv.FormatInt(sh, 10), dummy); err != nil {
+				//fmt.Println(err)
+				b.Error(err)
+			}
+			//u++
 		}
 	})
 }
@@ -147,7 +152,7 @@ func BenchmarkNewLarderParallel1(b *testing.B) {
 func BenchmarkNewLarderSequence(b *testing.B) {
 	b.StopTimer()
 	forTestClearDir("./log/")
-	dummy := forTestGetDummy(100) //make([]byte, 1000)
+	dummy := forTestGetDummy(1) //make([]byte, 1000)
 
 	p := porter.New()
 	resCntrl, err := forTestGetResouceControl()
