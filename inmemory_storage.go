@@ -5,7 +5,7 @@ package larder
 // Copyright © 2018-2019 Eduard Sesigin. All rights reserved. Contacts: <claygod@yandex.ru>
 
 import (
-	// "fmt"
+	//"fmt"
 	"sync"
 
 	"github.com/claygod/larder/repo"
@@ -63,4 +63,5 @@ func (s *inMemoryStorage) iterator(chRecord chan *repo.Record) {
 	chFinish := make(chan struct{})
 	s.repo.Iterator(chRecord, chFinish)
 	<-chFinish
+	close(chRecord)
 }

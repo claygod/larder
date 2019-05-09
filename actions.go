@@ -7,7 +7,6 @@ package larder
 import (
 	"fmt"
 	"sync/atomic"
-	"time"
 
 	_ "net/http/pprof"
 )
@@ -55,7 +54,7 @@ func (l *Larder) WriteList(input map[string][]byte) error {
 	}
 	defer l.checkPanic() // при ошибке записи в журнал там возможна паника, её перехватывать
 	// подготовка данных для сохранения в лог
-	req := reqWriteList{Time: time.Now().Unix(), List: input}
+	req := reqWriteList{Time: l.getTime(), List: input}
 	toSaveLog, err := l.bodyOperation(req, codeWriteList)
 	if err != nil {
 		return err
@@ -104,7 +103,7 @@ func (l *Larder) Transaction(handlerName string, keys []string, v interface{}) e
 	defer l.checkPanic() // при ошибке записи в журнал там возможна паника, её перехватывать
 
 	// подготовка данных для сохранения в лог
-	req := reqTransaction{Time: time.Now().Unix(), HandlerName: handlerName, Keys: keys, Value: v}
+	req := reqTransaction{Time: l.getTime(), HandlerName: handlerName, Keys: keys, Value: v}
 	toSaveLog, err := l.bodyOperation(req, codeTransaction)
 	if err != nil {
 		return err
@@ -180,7 +179,7 @@ func (l *Larder) DeleteList(keys []string) error {
 	}
 
 	//WAL
-	req := reqDeleteList{Time: time.Now().Unix(), Keys: keys}
+	req := reqDeleteList{Time: l.getTime(), Keys: keys}
 	if err := l.writeOperation(req, codeDeleteList); err != nil {
 		return err
 	}

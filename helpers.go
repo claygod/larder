@@ -11,6 +11,7 @@ import (
 	"io"
 	"os"
 	"sync/atomic"
+	"time"
 	"unsafe"
 )
 
@@ -32,7 +33,7 @@ func mockAlarmHandle(err error) { //TODO: возможно, тут будет п
 	panic(err)
 }
 
-func (l *Larder) loadRecordsFromCheckpoint(f *os.File) error {
+func loadRecordsFromCheckpoint(f *os.File, store *inMemoryStorage) error {
 	rSize := make([]byte, 8)
 	//out := map[string][]byte// make([]*reqWrite, 0)
 
@@ -48,7 +49,7 @@ func (l *Larder) loadRecordsFromCheckpoint(f *os.File) error {
 			}
 			return err
 		}
-		rSuint64 := bytesTUint64(rSize)
+		rSuint64 := bytesToUint64(rSize)
 		sizeKey := int16(rSuint64)
 		sizeValue := rSuint64 >> 16
 
@@ -74,7 +75,7 @@ func (l *Larder) loadRecordsFromCheckpoint(f *os.File) error {
 			return fmt.Errorf("The value is not fully loaded, (%v)", value)
 		}
 		//out[string(key)] = value //append(out, &reqWrite{Key: string(key), Value: value})
-		l.store.setUnsafeRecord(string(key), value)
+		store.setUnsafeRecord(string(key), value)
 	}
 	return nil
 }
@@ -143,7 +144,7 @@ func uint64ToBytes(i uint64) []byte {
 	//	}
 }
 
-func bytesTUint64(b []byte) uint64 {
+func bytesToUint64(b []byte) uint64 {
 	var x [8]byte
 	copy(x[:], b[:])
 	return *(*uint64)(unsafe.Pointer(&x))
@@ -184,4 +185,8 @@ func (l *Larder) bodyOperation(req interface{}, code byte) ([]byte, error) {
 		return nil, err
 	}
 	return toSaveLog, nil
+}
+
+func (l *Larder) getTime() int64 {
+	return time.Now().Unix()
 }

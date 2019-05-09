@@ -5,9 +5,12 @@ package larder
 // Copyright © 2018-2019 Eduard Sesigin. All rights reserved. Contacts: <claygod@yandex.ru>
 
 import (
-	"fmt"
+	//"fmt"
 	"os"
 	"runtime"
+	"sort"
+	"strconv"
+	"strings"
 	"sync/atomic"
 	"time"
 )
@@ -19,26 +22,68 @@ type Follow struct {
 	hasp             int64
 }
 
+/*
+newFollow - при создании ищем последний checkpoint и загружаем из него данные.
+*/
 func newFollow(jp string, store *inMemoryStorage) (*Follow, error) {
-	dir, err := os.Open(".")
+	lastCheckoutName, lastNumInt64, err := getLastCheckpoint(jp)
 	if err != nil {
 		return nil, err
 	}
-	defer dir.Close()
+	if lastNumInt64 != 0 {
+		fl, err := os.Open(jp + lastCheckoutName)
+		if err != nil {
+			return nil, err
+		}
+		if err := loadRecordsFromCheckpoint(fl, store); err != nil {
+			return nil, err
+		}
+	}
 
-	filesList, err := dir.Readdirnames(-1)
-	if err != nil {
-		return nil, err
+	fw := &Follow{
+		journalPath:      jp,
+		store:            store,
+		lastReadedLogNum: lastNumInt64,
 	}
+
+	return fw, nil
+}
+
+func getLastCheckpoint(dir string) (string, int64, error) {
+	filesList, err := loadFilesList(dir)
+	if err != nil {
+		return "", 0, err
+	}
+
+	chpList := make([]string, 0, len(filesList))
 	for _, fileName := range filesList {
-		fmt.Println(fileName) //TODO: load checkpoints and logs
+		if strings.HasSuffix(fileName, ".checkpoint") {
+			chpList = append(chpList, fileName)
+		}
+		//fmt.Println(fileName) //TODO: load checkpoints and logs
 	}
 
-	f := &Follow{
-		journalPath: jp,
-		store:       store,
+	if len(chpList) == 0 {
+		return "", 0, nil
 	}
-	return f, nil
+	sort.Strings(chpList)
+	//fmt.Println(chpList)
+
+	fileName := chpList[len(chpList)-1]
+	numStr := strings.Replace(fileName, ".checkpoint", "", 1)
+	numInt, err := strconv.ParseInt(numStr, 10, 64)
+
+	return fileName, numInt, err
+}
+
+func loadFilesList(dir string) ([]string, error) {
+	fl, err := os.Open(dir)
+	if err != nil {
+		return nil, err
+	}
+	defer fl.Close()
+
+	return fl.Readdirnames(-1)
 }
 
 func (f *Follow) start() {

@@ -69,10 +69,16 @@ func New(filePath string, porter Porter, resCtrl Resourcer, batchSize int) (*Lar
 	// 	return nil, err
 	// }
 
+	follow, err := newFollow(filePath, newStorage(repo.New())) //double-storage
+	if err != nil {
+		return nil, err
+	}
+
 	return &Larder{
 		porter:   porter,
 		handlers: handlers.New(),
 		store:    newStorage(repo.New()),
+		follow:   follow,
 		//journal:  j,
 		resControl: resCtrl,
 		//chJournal: chInput,
@@ -133,21 +139,19 @@ func (l *Larder) Save() error {
 
 	chRecord := make(chan *repo.Record, 10) //TODO: size?
 	l.store.iterator(chRecord)
-	for rec := <-chRecord; ; {
-		switch {
-		case rec == nil:
+	for {
+		rec := <-chRecord
+		if rec == nil {
 			break
-		default:
-			//TODO save rec to checkpoint
-			prb, err := l.prepareRecordToCheckpoint(rec.Key, rec.Body)
-			if err != nil {
-				defer os.Remove(chpName)
-				return err
-			}
-			if _, err := f.Write(prb); err != nil {
-				defer os.Remove(chpName)
-				return err
-			}
+		}
+		prb, err := l.prepareRecordToCheckpoint(rec.Key, rec.Body)
+		if err != nil {
+			defer os.Remove(chpName)
+			return err
+		}
+		if _, err := f.Write(prb); err != nil {
+			defer os.Remove(chpName)
+			return err
 		}
 	}
 	if err := os.Rename(chpName, chpName+"point"); err != nil {

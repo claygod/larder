@@ -190,7 +190,7 @@ func forTestClearDir(dir string) error {
 	}
 	for _, name := range names {
 		//fmt.Println(name)
-		if strings.HasSuffix(name, ".log") {
+		if strings.HasSuffix(name, ".log") || strings.HasSuffix(name, ".check") || strings.HasSuffix(name, ".checkpoint") {
 			os.Remove(dir + name)
 		}
 		//		err = os.RemoveAll(filepath.Join(dir, name))
