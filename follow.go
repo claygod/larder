@@ -5,7 +5,7 @@ package larder
 // Copyright © 2018-2019 Eduard Sesigin. All rights reserved. Contacts: <claygod@yandex.ru>
 
 import (
-	//"fmt"
+	"fmt"
 	"os"
 	"runtime"
 	"sort"
@@ -50,24 +50,13 @@ func newFollow(jp string, store *inMemoryStorage) (*Follow, error) {
 }
 
 func getLastCheckpoint(dir string) (string, int64, error) {
-	filesList, err := loadFilesList(dir)
-	if err != nil {
+	chpList, err := loadSuffixFilesList(dir, ".checkpoint")
+	if err != nil || len(chpList) == 0 {
 		return "", 0, err
-	}
-
-	chpList := make([]string, 0, len(filesList))
-	for _, fileName := range filesList {
-		if strings.HasSuffix(fileName, ".checkpoint") {
-			chpList = append(chpList, fileName)
-		}
-		//fmt.Println(fileName) //TODO: load checkpoints and logs
-	}
-
-	if len(chpList) == 0 {
-		return "", 0, nil
 	}
 	sort.Strings(chpList)
 	//fmt.Println(chpList)
+	//TODO: в зависимости от конфига тут можно будет удалять старые `checkpoint`
 
 	fileName := chpList[len(chpList)-1]
 	numStr := strings.Replace(fileName, ".checkpoint", "", 1)
@@ -76,7 +65,22 @@ func getLastCheckpoint(dir string) (string, int64, error) {
 	return fileName, numInt, err
 }
 
-func loadFilesList(dir string) ([]string, error) {
+func loadSuffixFilesList(dir string, suffix string) ([]string, error) {
+	filesList, err := loadAllFilesList(dir)
+	if err != nil {
+		return nil, err
+	}
+
+	suffList := make([]string, 0, len(filesList))
+	for _, fileName := range filesList {
+		if strings.HasSuffix(fileName, suffix) {
+			suffList = append(suffList, fileName)
+		}
+	}
+	return suffList, nil
+}
+
+func loadAllFilesList(dir string) ([]string, error) {
 	fl, err := os.Open(dir)
 	if err != nil {
 		return nil, err
@@ -99,7 +103,7 @@ func (f *Follow) start() {
 	}
 }
 
-func (f *Follow) stop() {
+func (f *Follow) stop() { //TODO: переделать на остановку с учётом остановки воркера
 	for {
 		if atomic.LoadInt64(&f.hasp) == stateStopped || atomic.CompareAndSwapInt64(&f.hasp, stateStarted, stateStopped) {
 			return
@@ -110,17 +114,56 @@ func (f *Follow) stop() {
 }
 
 func (f *Follow) worker() {
-	for state := atomic.LoadInt64(&f.hasp); ; {
+	for {
+		state := atomic.LoadInt64(&f.hasp)
 		switch state {
 		case stateStopped:
 			return
 		default:
-			f.follow()
+			if err := f.follow(); err != nil {
+				//TODO: добавить логгер в структуру и ошибки сыпать в лог
+			}
 		}
-		time.Sleep(100 * time.Second)
+		f.sleep(100*100, 10*time.Millisecond) // пауза 100 секунд
 	}
 }
 
-func (f *Follow) follow() {
-	//TODO: new logs control
+func (f *Follow) sleep(countIter int, dur time.Duration) {
+	for i := 0; i < countIter; i++ {
+		if state := atomic.LoadInt64(&f.hasp); state == stateStopped {
+			return
+		}
+		time.Sleep(dur)
+	}
+}
+
+func (f *Follow) follow() error { //этот метод не подразумевает параллельной работы
+	var errOut error
+	lastLogNumInt64 := atomic.LoadInt64(&f.lastReadedLogNum)
+	//lastLogNumStr := strconv.FormatInt(lastLogNumInt64, 10)
+	filesNamesList, err := loadSuffixFilesList(f.journalPath, ".log")
+	if err != nil {
+		return err
+	}
+	sort.Strings(filesNamesList)
+
+	for _, fileName := range filesNamesList {
+		numStr := strings.Replace(fileName, ".log", "", 1)
+		numInt64, err := strconv.ParseInt(numStr, 10, 64)
+		if err != nil { //TODO: добавить логгер в структуру и ошибки сыпать в лог
+			errOut = fmt.Errorf("%s %s", errOut.Error(), err.Error())
+			continue
+		}
+
+		if numInt64 > lastLogNumInt64 {
+			if atomic.CompareAndSwapInt64(&f.lastReadedLogNum, lastLogNumInt64, numInt64) {
+				//TODO: скачиваем лог и применяем операции из него к дублированной базе
+				// OK, обновили номер
+			} else {
+				errOut = fmt.Errorf("%s %s", errOut.Error(), fmt.Errorf("Parallel worker detected (follow struct). Must be one!"))
+				break
+			}
+		}
+	}
+	return errOut
 }

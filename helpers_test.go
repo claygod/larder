@@ -34,8 +34,8 @@ func TestCheckpoint(t *testing.T) {
 		t.Error(err)
 		return
 	}
-	//defer os.Remove("./log/tmp.txt")
-	//forTestClearDir("./log/")
+	defer os.Remove("./log/tmp.txt")
+	forTestClearDir("./log/")
 	f, err := os.Open("./log/tmp.txt")
 	if err != nil {
 		t.Error(err)
