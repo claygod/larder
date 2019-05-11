@@ -55,7 +55,7 @@ func (l *Larder) WriteList(input map[string][]byte) error {
 	defer l.checkPanic() // при ошибке записи в журнал там возможна паника, её перехватывать
 	// подготовка данных для сохранения в лог
 	req := reqWriteList{Time: l.getTime(), List: input}
-	toSaveLog, err := l.bodyOperation(req, codeWriteList)
+	toSaveLog, err := l.bodyOperationEncode(req, codeWriteList)
 	if err != nil {
 		return err
 	}
@@ -104,7 +104,7 @@ func (l *Larder) Transaction(handlerName string, keys []string, v interface{}) e
 
 	// подготовка данных для сохранения в лог
 	req := reqTransaction{Time: l.getTime(), HandlerName: handlerName, Keys: keys, Value: v}
-	toSaveLog, err := l.bodyOperation(req, codeTransaction)
+	toSaveLog, err := l.bodyOperationEncode(req, codeTransaction)
 	if err != nil {
 		return err
 	}

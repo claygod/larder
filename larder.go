@@ -68,15 +68,16 @@ func New(filePath string, porter Porter, resCtrl Resourcer, batchSize int) (*Lar
 	// if err != nil {
 	// 	return nil, err
 	// }
+	handlers := handlers.New()
 
-	follow, err := newFollow(filePath, newStorage(repo.New())) //double-storage
+	follow, err := newFollow(filePath, newStorage(repo.New()), handlers) //double-storage
 	if err != nil {
 		return nil, err
 	}
 
 	return &Larder{
 		porter:   porter,
-		handlers: handlers.New(),
+		handlers: handlers,
 		store:    newStorage(repo.New()),
 		follow:   follow,
 		//journal:  j,

@@ -13,6 +13,8 @@ import (
 	"sync/atomic"
 	"time"
 	"unsafe"
+
+	"github.com/claygod/larder/handlers"
 )
 
 func (l *Larder) getKeysFromArray(arr map[string][]byte) []string {
@@ -31,6 +33,78 @@ func (l *Larder) getHeader(keys []string) []string {
 
 func mockAlarmHandle(err error) { //TODO: возможно, тут будет передаваться логгер
 	panic(err)
+}
+
+func loadOperationsFromLog(f *os.File, store *inMemoryStorage, handlers *handlers.Handlers) error {
+	rSize := make([]byte, 8)
+	for {
+		_, err := f.Read(rSize)
+		if err != nil {
+			if err == io.EOF {
+				break
+			}
+			return err
+		}
+		dec, code, err := getGobDecoderWithBuffer(f, rSize)
+		if err != nil {
+			return err
+		}
+
+		switch code {
+		case codeWriteList:
+			var req reqWriteList
+			err = dec.Decode(&req)
+			if err != nil {
+				return err
+			}
+			store.setRecords(req.List) //TODO: в хранилище добавить unsafe set
+		case codeDeleteList:
+			var req reqDeleteList
+			err = dec.Decode(&req)
+			if err != nil {
+				return err
+			}
+			store.delRecords(req.Keys) //TODO: в хранилище добавить unsafe del
+		case codeTransaction:
+			var req reqTransaction
+			err = dec.Decode(&req)
+			if err != nil {
+				return err
+			}
+			hdl, err := handlers.Get(req.HandlerName) // берём хэндлер
+			if err != nil {
+				return err
+			}
+			curValues, err := store.getRecords(req.Keys) // читаем текущие значения
+			if err != nil {
+				return err
+			}
+			store.transaction(req.Value, curValues, hdl) //TODO: в хранилище добавить unsafe transaction
+		default:
+			return fmt.Errorf("Unknown %d code", code)
+		}
+	}
+	return nil
+}
+
+func getGobDecoderWithBuffer(f *os.File, rSize []byte) (*gob.Decoder, byte, error) {
+	rSuint64 := bytesToUint64(rSize)
+	bArr := make([]byte, rSuint64)
+	n, err := f.Read(bArr)
+	if err != nil {
+		return nil, 0, err
+	} else if n != int(rSuint64) {
+		return nil, 0, fmt.Errorf("The operation is not fully loaded, want %d bytes, have %d bytes", int(rSuint64), n)
+	}
+	code := bArr[0]
+	var buf bytes.Buffer
+	n, err = buf.Write(bArr[1:])
+	if err != nil {
+		return nil, 0, err
+	} else if n != int(rSuint64)-1 {
+		return nil, 0, fmt.Errorf("The buffer is not fully, want %d bytes, have %d bytes", int(rSuint64)-1, n)
+	}
+	return gob.NewDecoder(&buf), code, nil
 }
 
 func loadRecordsFromCheckpoint(f *os.File, store *inMemoryStorage) error {
@@ -93,25 +167,6 @@ func (l *Larder) prepareRecordToCheckpoint(key string, value []byte) ([]byte, er
 	size += uint64(len(key))
 
 	return append(uint64ToBytes(size), (append([]byte(key), value...))...), nil
-
-	//	rw := reqWrite{
-	//		Key:   key,
-	//		Value: value,
-	//	}
-	//	var bufBody bytes.Buffer
-	//	ge := gob.NewEncoder(&bufBody)
-	//	if err := ge.Encode(rw); err != nil {
-	//		return nil, err
-	//	}
-
-	//	var buf bytes.Buffer
-	//	if _, err := buf.Write(uint64ToBytes(uint64(bufBody.Len()))); err != nil {
-	//		return nil, err
-	//	}
-	//	if _, err := buf.Write(bufBody.Bytes()); err != nil {
-	//		return nil, err
-	//	}
-	//	return buf.Bytes(), nil
 }
 
 func (l *Larder) prepareOperatToLog(code byte, value []byte) ([]byte, error) {
@@ -174,7 +229,7 @@ func (l *Larder) writeOperation(req interface{}, code byte) error {
 	return nil
 }
 
-func (l *Larder) bodyOperation(req interface{}, code byte) ([]byte, error) {
+func (l *Larder) bodyOperationEncode(req interface{}, code byte) ([]byte, error) {
 	var reqBuf bytes.Buffer
 	enc := gob.NewEncoder(&reqBuf)
 	if err := enc.Encode(req); err != nil {

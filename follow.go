@@ -13,11 +13,14 @@ import (
 	"strings"
 	"sync/atomic"
 	"time"
+
+	"github.com/claygod/larder/handlers"
 )
 
 type Follow struct {
 	journalPath      string
 	store            *inMemoryStorage
+	handlers         *handlers.Handlers
 	lastReadedLogNum int64
 	hasp             int64
 }
@@ -25,7 +28,7 @@ type Follow struct {
 /*
 newFollow - при создании ищем последний checkpoint и загружаем из него данные.
 */
-func newFollow(jp string, store *inMemoryStorage) (*Follow, error) {
+func newFollow(jp string, store *inMemoryStorage, handlers *handlers.Handlers) (*Follow, error) {
 	lastCheckoutName, lastNumInt64, err := getLastCheckpoint(jp)
 	if err != nil {
 		return nil, err
@@ -43,6 +46,7 @@ func newFollow(jp string, store *inMemoryStorage) (*Follow, error) {
 	fw := &Follow{
 		journalPath:      jp,
 		store:            store,
+		handlers:         handlers,
 		lastReadedLogNum: lastNumInt64,
 	}
 
@@ -161,8 +165,8 @@ func (f *Follow) follow() error { //этот метод не подразуме�
 				// OK, обновили номер
 			} else {
 				errOut = fmt.Errorf("%s %s", errOut.Error(), fmt.Errorf("Parallel worker detected (follow struct). Must be one!"))
-				break
 			}
+			break
 		}
 	}
 	return errOut
